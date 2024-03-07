@@ -1,4 +1,4 @@
-if CONFIG_TARGET_MX6ULL_ALIENTEK_EMMC
+if TARGET_MX6ULL_ALIENTEK_EMMC
 
 config SYS_BOARD
 	default "mx6ull_alientek_emmc"
