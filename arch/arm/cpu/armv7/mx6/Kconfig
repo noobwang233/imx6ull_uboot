@@ -237,7 +237,11 @@ config TARGET_MX6SXSCM
         select MX6SX
         select DM
         select DM_THERMAL
-
+config TARGET_MX6ULL_ALIENTEK_EMMC
+		bool "Support mx6ull_alientek_emmc"
+		select MX6ULL
+		select DM
+		select DM_THERMAL
 endchoice
 
 config SYS_SOC
@@ -278,5 +282,5 @@ source "board/wandboard/Kconfig"
 source "board/warp/Kconfig"
 source "board/freescale/mx6dqscm/Kconfig"
 source "board/freescale/mx6sxscm/Kconfig"
-
+source "board/freescale/mx6ull_alientek_emmc/Kconfig"
 endif
