@@ -684,15 +684,15 @@ struct display_info_t const displays[] = {{
 
 	.mode	= {
 		.name			= "TFT43AB",
-		.xres           = 480,
-		.yres           = 272,
-		.pixclock       = 108695,
-		.left_margin    = 8,
-		.right_margin   = 4,
-		.upper_margin   = 2,
-		.lower_margin   = 4,
-		.hsync_len      = 41,
-		.vsync_len      = 10,
+		.xres           = 800,
+		.yres           = 480,
+		.pixclock       = 32342,
+		.left_margin    = 88,
+		.right_margin   = 40,
+		.upper_margin   = 32,
+		.lower_margin   = 13,
+		.hsync_len      = 48,
+		.vsync_len      = 3,
 		.sync           = 0,
 		.vmode          = FB_VMODE_NONINTERLACED
 } } };
