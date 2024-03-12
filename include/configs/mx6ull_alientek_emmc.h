@@ -202,18 +202,10 @@
 			"fi;\0" \
 
 #define CONFIG_BOOTCOMMAND \
-	   "run findfdt;" \
-	   "mmc dev ${mmcdev};" \
-	   "mmc dev ${mmcdev}; if mmc rescan; then " \
-		   "if run loadbootscript; then " \
-			   "run bootscript; " \
-		   "else " \
-			   "if run loadimage; then " \
-				   "run mmcboot; " \
-			   "else run netboot; " \
-			   "fi; " \
-		   "fi; " \
-	   "else run netboot; fi"
+	"mmc dev 1;" \
+	"fatload mmc 1:1 0x80800000 zImage;" \
+	"fatload mmc 1:1 0x83000000 imx6ull-alientek-emmc.dtb;" \
+	"bootz 0x80800000 - 0x83000000;"	
 #endif
 
 /* Miscellaneous configurable options */
