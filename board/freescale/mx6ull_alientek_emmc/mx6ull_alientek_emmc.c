@@ -91,49 +91,6 @@ DECLARE_GLOBAL_DATA_PTR;
 #define ENET1_RESET IMX_GPIO_NR(5, 7)
 #define ENET2_RESET IMX_GPIO_NR(5, 8)
 
-/*
- * HDMI_nRST --> Q0
- * ENET1_nRST --> Q1
- * ENET2_nRST --> Q2
- * CAN1_2_STBY --> Q3
- * BT_nPWD --> Q4
- * CSI_RST --> Q5
- * CSI_PWDN --> Q6
- * LCD_nPWREN --> Q7
- */
-enum qn {
-	HDMI_NRST,
-	ENET1_NRST,
-	ENET2_NRST,
-	CAN1_2_STBY,
-	BT_NPWD,
-	CSI_RST,
-	CSI_PWDN,
-	LCD_NPWREN,
-};
-
-enum qn_func {
-	qn_reset,
-	qn_enable,
-	qn_disable,
-};
-
-enum qn_level {
-	qn_low = 0,
-	qn_high = 1,
-};
-
-static enum qn_level seq[3][2] = {
-	{0, 1}, {1, 1}, {0, 0}
-};
-
-static enum qn_func qn_output[8] = {
-	qn_reset, qn_reset, qn_reset, qn_enable, qn_disable, qn_reset,
-	qn_disable, qn_disable
-};
-
-
-
 #ifdef CONFIG_SYS_I2C_MXC
 #define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
 /* I2C1 for PMIC and EEPROM */
