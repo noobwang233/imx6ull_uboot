@@ -204,7 +204,7 @@
 #define CONFIG_BOOTCOMMAND \
 	"mmc dev 1;" \
 	"fatload mmc 1:1 0x80800000 zImage;" \
-	"fatload mmc 1:1 0x83000000 imx6ull-alientek-emmc.dtb;" \
+	"fatload mmc 1:1 0x83000000 imx6ull-14x14-emmc-4.3-800x480-c.dtb;" \
 	"bootz 0x80800000 - 0x83000000;"	
 #endif
 
