@@ -108,7 +108,8 @@ _fiq:			.word fiq
 /* SPL interrupt handling: just hang */
 
 //这个部分的中断处理是在使用SPL的情况下才使用的，SPL（Second Program Loader）,是由于芯片内部的SRAM空间不够存放
-//整个u-boot，先将u-boot的一部分（一般是4KB左右）拷贝到芯片内部的SRAM空间
+//整个u-boot，先将u-boot的一部分（一般是4KB左右）拷贝到芯片内部的SRAM空间,然后通过这部分代码初始化DDR之类的外接内存
+//之后将u-boot拷贝到DDR运行
 #ifdef CONFIG_SPL_BUILD
 
 	.align	5 //.align  n 以2的n次方个字节对齐 即32对齐 */
@@ -124,17 +125,20 @@ fiq:
 	bl	1b			/* hang and never return */
 
 #else	/* !CONFIG_SPL_BUILD */
-
+//不使用SPL的情况，由于imx6的bootROM可以直接初始化DDR,并将整个u-boot拷贝到DDR运行，所有并没有使用SPL
 /* IRQ stack memory (calculated at run-time) + 8 bytes */
 .globl IRQ_STACK_START_IN
 IRQ_STACK_START_IN:
-	.word	0x0badc0de
+	.word	0x0badc0de //定义全局标号，标号处存储数值0x0badcode 坏的代码//预留数据
 
+
+//是只有当定义了宏CONFIG_USE_IRQ的时候，才用到这两个变量，其含义也很明显，
+//只有用到了中断IRQ，才会用到中断的堆栈，才有中断堆栈的起始地址。
 #ifdef CONFIG_USE_IRQ
 /* IRQ stack memory (calculated at run-time) */
 .globl IRQ_STACK_START
 IRQ_STACK_START:
-	.word	0x0badc0de
+	.word	0x0badc0de//预留数据
 
 /* IRQ stack memory (calculated at run-time) */
 .globl FIQ_STACK_START
@@ -143,8 +147,9 @@ FIQ_STACK_START:
 
 #endif /* CONFIG_USE_IRQ */
 
+
 @
-@ IRQ stack frame.
+@ 
 @
 #define S_FRAME_SIZE	72
 
@@ -175,14 +180,15 @@ FIQ_STACK_START:
  * use bad_save_user_regs for abort/prefetch/undef/swi ...
  * use irq_save_user_regs / irq_restore_user_regs for IRQ/FIQ handling
  */
+	//用来保存程序“出错”时用户态的寄存器的值。
+	.macro	bad_save_user_regs  // carve out a frame on current user stack
+	sub	sp, sp, #S_FRAME_SIZE   // 这个宏既然是用来“保存寄存器”的，那保存在哪呢？自然是保存在“栈”中：先令sp指针自减S_FRAME_SIZE
+	stmia	sp, {r0 - r12}	    // Save user registers (now in svc mode) r0-r12, ia 表示 increase after save
+								// 就是保存一个，就增加4个字节。所以，r0 - r12这13个寄存器一共13*4=52字节
+								// 就被从下到上保存在刚刚划出的栈空间
 
-	.macro	bad_save_user_regs
-	@ carve out a frame on current user stack
-	sub	sp, sp, #S_FRAME_SIZE
-	stmia	sp, {r0 - r12}	@ Save user registers (now in svc mode) r0-r12
-	ldr	r2, IRQ_STACK_START_IN
-	@ get values for "aborted" pc and cpsr (into parm regs)
-	ldmia	r2, {r2 - r3}
+	ldr	r2, IRQ_STACK_START_IN  // get values for "aborted" pc and cpsr (into parm regs), 获取终止的pc和cpsr值（即badcode），存放在r2寄存器
+	ldmia	r2, {r2 - r3}		
 	add	r0, sp, #S_FRAME_SIZE		@ grab pointer to old stack
 	add	r5, sp, #S_SP
 	mov	r1, lr
