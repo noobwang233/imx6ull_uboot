@@ -23,7 +23,7 @@
  *************************************************************************
  */
 
-.globl _start
+.globl _start //定义全局标号_start，供其他地方使用
 
 /*
  *************************************************************************
@@ -33,7 +33,7 @@
  *************************************************************************
  */
 
-	.section ".vectors", "ax"
+	.section ".vectors", "ax" //定义vectors段，"ax"是 allocation  execute的缩写，表示该节区可分配并且可执行
 
 /*
  *************************************************************************
@@ -47,18 +47,27 @@
 
 _start:
 
+/*
+CONFIG_SYS_DV_NOR_BOOT_CFG:	AM18xx based boards, booting in NOR Boot mode
+								need a "NOR Boot Configuration Word" stored
+								in the NOR Flash. This define adds this.
+								More Info about this, see:
+								spraba5a.pdf chapter 3.1
+*/
+//从NOR Flash启动的配置宏定义
 #ifdef CONFIG_SYS_DV_NOR_BOOT_CFG
 	.word	CONFIG_SYS_DV_NOR_BOOT_CFG
 #endif
-
-	b	reset
-	ldr	pc, _undefined_instruction
-	ldr	pc, _software_interrupt
-	ldr	pc, _prefetch_abort
-	ldr	pc, _data_abort
-	ldr	pc, _not_used
-	ldr	pc, _irq
-	ldr	pc, _fiq
+	//根据imx6ull的启动方式，由芯片内部的bootROM将uboot搬运到指定地址运行
+	//这个地址由u-boot.imx头部IVT内定义的entry地址处运行。
+	b	reset 						//第一个指令，跳转到reset处运行，这里使用的是b相对跳转，所以与运行位置无关
+	ldr	pc, _undefined_instruction  //将_undefined_instruction处的值加载进pc指针	//中断向量表，未定义中断
+	ldr	pc, _software_interrupt		//中断向量表，软中断
+	ldr	pc, _prefetch_abort			//中断向量表，...
+	ldr	pc, _data_abort				//中断向量表，...
+	ldr	pc, _not_used				//中断向量表，...
+	ldr	pc, _irq					//中断向量表，中断
+	ldr	pc, _fiq					//中断向量表，快速中断
 
 /*
  *************************************************************************
@@ -70,7 +79,7 @@ _start:
  *************************************************************************
  */
 
-	.globl	_undefined_instruction
+	.globl	_undefined_instruction	//定义全局标号_undefined_instruction
 	.globl	_software_interrupt
 	.globl	_prefetch_abort
 	.globl	_data_abort
@@ -78,15 +87,15 @@ _start:
 	.globl	_irq
 	.globl	_fiq
 
-_undefined_instruction:	.word undefined_instruction
+_undefined_instruction:	.word undefined_instruction //_undefined_instruction标号处存放了 一个word(32bit)大小的变量 undefined_instruction
 _software_interrupt:	.word software_interrupt
 _prefetch_abort:	.word prefetch_abort
 _data_abort:		.word data_abort
 _not_used:		.word not_used
 _irq:			.word irq
 _fiq:			.word fiq
-
-	.balignl 16,0xdeadbeef
+//到这里位置指令一共15条，一个指令32bit 4个字节，一共60字节(.globl伪指令并不算指令)
+	.balignl 16,0xdeadbeef //以0xdeadbeef填充后续地址空间，使地址以16对齐，即地址相对于第一条指令地址偏移64字节
 
 /*
  *************************************************************************
@@ -98,9 +107,11 @@ _fiq:			.word fiq
 
 /* SPL interrupt handling: just hang */
 
+//这个部分的中断处理是在使用SPL的情况下才使用的，SPL（Second Program Loader）,是由于芯片内部的SRAM空间不够存放
+//整个u-boot，先将u-boot的一部分（一般是4KB左右）拷贝到芯片内部的SRAM空间
 #ifdef CONFIG_SPL_BUILD
 
-	.align	5
+	.align	5 //.align  n 以2的n次方个字节对齐 即32对齐 */
 undefined_instruction:
 software_interrupt:
 prefetch_abort:
