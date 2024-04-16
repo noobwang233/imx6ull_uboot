@@ -66,8 +66,9 @@
 
 ENTRY(_main)
 
+
 /*
- * Set up initial C runtime environment and call board_init_f(0).
+ *设置初始 C 运行时环境并调用 board_init_f(0) 函数。
  */
 
 #if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_STACK)
@@ -75,7 +76,7 @@ ENTRY(_main)
 #else
 	ldr	sp, =(CONFIG_SYS_INIT_SP_ADDR)
 #endif
-#if defined(CONFIG_CPU_V7M)	/* v7M forbids using SP as BIC destination */
+#if defined(CONFIG_CPU_V7M)	/* v7M 禁止使用 SP 作为 BIC 的目的地 */
 	mov	r3, sp
 	bic	r3, r3, #7
 	mov	sp, r3
@@ -95,9 +96,8 @@ ENTRY(_main)
 #if ! defined(CONFIG_SPL_BUILD)
 
 /*
- * Set up intermediate environment (new sp and gd) and call
- * relocate_code(addr_moni). Trick here is that we'll return
- * 'here' but relocated.
+ * 设置中间环境（新的堆栈指针和全局数据结构），然后调用 relocate_code(addr_moni) 函数。
+ * 这里的技巧是，我们将返回 'here'，但是已经重定位过了。
  */
 
 	ldr	sp, [r9, #GD_START_ADDR_SP]	/* sp = gd->start_addr_sp */
