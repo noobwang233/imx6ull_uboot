@@ -1,67 +1,16 @@
-/*
- *  vectors - Generic ARM exception table code
- *
- *  Copyright (c) 1998	Dan Malek <dmalek@jlc.net>
- *  Copyright (c) 1999	Magnus Damm <kieraypc01.p.y.kie.era.ericsson.se>
- *  Copyright (c) 2000	Wolfgang Denk <wd@denx.de>
- *  Copyright (c) 2001	Alex Züpke <azu@sysgo.de>
- *  Copyright (c) 2001	Marius Gröger <mag@sysgo.de>
- *  Copyright (c) 2002	Alex Züpke <azu@sysgo.de>
- *  Copyright (c) 2002	Gary Jennejohn <garyj@denx.de>
- *  Copyright (c) 2002	Kyle Harris <kharris@nexus-tech.net>
- *
- * SPDX-License-Identifier:	GPL-2.0+
- */
-
 #include <config.h>
-
-/*
- *************************************************************************
- *
- * Symbol _start is referenced elsewhere, so make it global
- *
- *************************************************************************
- */
 
 .globl _start //定义全局标号_start，供其他地方使用
 
-/*
- *************************************************************************
- *
- * Vectors have their own section so linker script can map them easily
- *
- *************************************************************************
- */
-
+	/* 为中断向量表单独定义一个段，方便链接脚本的对其map */
 	.section ".vectors", "ax" //定义vectors段，"ax"是 allocation  execute的缩写，表示该节区可分配并且可执行
 
-/*
- *************************************************************************
- *
- * Exception vectors as described in ARM reference manuals
- *
- * Uses indirect branch to allow reaching handlers anywhere in memory.
- *
- *************************************************************************
- */
-
-_start:
-
-/*
-CONFIG_SYS_DV_NOR_BOOT_CFG:	AM18xx based boards, booting in NOR Boot mode
-								need a "NOR Boot Configuration Word" stored
-								in the NOR Flash. This define adds this.
-								More Info about this, see:
-								spraba5a.pdf chapter 3.1
-*/
-//从NOR Flash启动的配置宏定义
-#ifdef CONFIG_SYS_DV_NOR_BOOT_CFG
-	.word	CONFIG_SYS_DV_NOR_BOOT_CFG
-#endif
+_start: //程序入口
 	//根据imx6ull的启动方式，由芯片内部的bootROM将uboot搬运到指定地址运行
 	//这个地址由u-boot.imx头部IVT内定义的entry地址处运行。
 	b	reset 						//第一个指令，跳转到reset处运行，这里使用的是b相对跳转，所以与运行位置无关
-	ldr	pc, _undefined_instruction  //将_undefined_instruction处的值加载进pc指针	//中断向量表，未定义中断
+	/* 使用间接，使pc跳转到对应的中断向量处，可以让此代码在内存任何位置都可以运行 */
+	ldr	pc, _undefined_instruction  //使用间接跳转，跳转到_undefined_instruction处	//中断向量表，未定义中断
 	ldr	pc, _software_interrupt		//中断向量表，软中断
 	ldr	pc, _prefetch_abort			//中断向量表，...
 	ldr	pc, _data_abort				//中断向量表，...
@@ -69,16 +18,7 @@ CONFIG_SYS_DV_NOR_BOOT_CFG:	AM18xx based boards, booting in NOR Boot mode
 	ldr	pc, _irq					//中断向量表，中断
 	ldr	pc, _fiq					//中断向量表，快速中断
 
-/*
- *************************************************************************
- *
- * Indirect vectors table
- *
- * Symbols referenced here must be defined somewhere else
- *
- *************************************************************************
- */
-
+	/* 间接的中断向量表，这里所列出的的标号需要被定义 */
 	.globl	_undefined_instruction	//定义全局标号_undefined_instruction
 	.globl	_software_interrupt
 	.globl	_prefetch_abort
@@ -96,6 +36,8 @@ _irq:			.word irq
 _fiq:			.word fiq
 //到这里位置指令一共15条，一个指令32bit 4个字节，一共60字节(.globl伪指令并不算指令)
 	.balignl 16,0xdeadbeef //以0xdeadbeef填充后续地址空间，使地址以16对齐，即地址相对于第一条指令地址偏移64字节
+
+
 
 /*
  *************************************************************************
