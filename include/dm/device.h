@@ -26,13 +26,13 @@ struct driver_info;
 /* DM is responsible for allocating and freeing platdata */
 #define DM_FLAG_ALLOC_PDATA		(1 << 1)
 
-/* DM should init this device prior to relocation */
+/* 设备模型应在重定位之前初始化此设备 */
 #define DM_FLAG_PRE_RELOC		(1 << 2)
 
-/* DM is responsible for allocating and freeing parent_platdata */
+/* 设备模型负责分配和释放 parent_platdata */
 #define DM_FLAG_ALLOC_PARENT_PDATA	(1 << 3)
 
-/* DM is responsible for allocating and freeing uclass_platdata */
+/* 设备模型负责分配和释放 uclass_platdata */
 #define DM_FLAG_ALLOC_UCLASS_PDATA	(1 << 4)
 
 /* Allocate driver private data on a DMA boundary */
@@ -42,68 +42,59 @@ struct driver_info;
 #define DM_FLAG_BOUND			(1 << 6)
 
 /**
- * struct udevice - An instance of a driver
+ * struct udevice - 一个驱动程序的实例
  *
- * This holds information about a device, which is a driver bound to a
- * particular port or peripheral (essentially a driver instance).
+ * 这个结构体保存有关设备的信息，设备是绑定到特定端口或外设的驱动程序（实际上是一个驱动程序实例）。
  *
- * A device will come into existence through a 'bind' call, either due to
- * a U_BOOT_DEVICE() macro (in which case platdata is non-NULL) or a node
- * in the device tree (in which case of_offset is >= 0). In the latter case
- * we translate the device tree information into platdata in a function
- * implemented by the driver ofdata_to_platdata method (called just before the
- * probe method if the device has a device tree node.
+ * 设备将通过 'bind' 调用而存在，这要么是由于 U_BOOT_DEVICE() 宏（在这种情况下 platdata 是非空的），
+ * 要么是由于设备树中的一个节点（在这种情况下 of_offset >= 0）。在后一种情况下，我们将设备树信息转换为
+ * platdata，这是由驱动程序的 ofdata_to_platdata 方法实现的（如果设备具有设备树节点，则在探测方法之前调用此方法）。
  *
- * All three of platdata, priv and uclass_priv can be allocated by the
- * driver, or you can use the auto_alloc_size members of struct driver and
- * struct uclass_driver to have driver model do this automatically.
+ * platdata、priv 和 uclass_priv 这三个成员可以由驱动程序分配，或者您可以使用 struct driver 和
+ * struct uclass_driver 的 auto_alloc_size 成员，使驱动程序模型自动执行此操作。
  *
- * @driver: The driver used by this device
- * @name: Name of device, typically the FDT node name
- * @platdata: Configuration data for this device
- * @parent_platdata: The parent bus's configuration data for this device
- * @uclass_platdata: The uclass's configuration data for this device
- * @of_offset: Device tree node offset for this device (- for none)
- * @driver_data: Driver data word for the entry that matched this device with
- *		its driver
- * @parent: Parent of this device, or NULL for the top level device
- * @priv: Private data for this device
- * @uclass: Pointer to uclass for this device
- * @uclass_priv: The uclass's private data for this device
- * @parent_priv: The parent's private data for this device
- * @uclass_node: Used by uclass to link its devices
- * @child_head: List of children of this device
- * @sibling_node: Next device in list of all devices
- * @flags: Flags for this device DM_FLAG_...
- * @req_seq: Requested sequence number for this device (-1 = any)
- * @seq: Allocated sequence number for this device (-1 = none). This is set up
- * when the device is probed and will be unique within the device's uclass.
- * @devres_head: List of memory allocations associated with this device.
- *		When CONFIG_DEVRES is enabled, devm_kmalloc() and friends will
- *		add to this list. Memory so-allocated will be freed
- *		automatically when the device is removed / unbound
+ * @driver: 该设备使用的驱动程序
+ * @name: 设备的名称，通常是 FDT 节点名称
+ * @platdata: 该设备的配置数据
+ * @parent_platdata: 该设备的父总线的配置数据
+ * @uclass_platdata: 该设备的 uclass 的配置数据
+ * @of_offset: 该设备的设备树节点偏移量（- 表示没有）
+ * @driver_data: 与该设备匹配的条目的驱动程序数据字
+ * @parent: 该设备的父级，对于顶级设备为 NULL
+ * @priv: 该设备的私有数据
+ * @uclass: 指向该设备的 uclass
+ * @uclass_priv: 该设备的 uclass 的私有数据
+ * @parent_priv: 该设备的父级的私有数据
+ * @uclass_node: uclass 用于链接其设备的节点
+ * @child_head: 该设备的子设备列表
+ * @sibling_node: 所有设备列表中的下一个设备
+ * @flags: 该设备的标志 DM_FLAG_...
+ * @req_seq: 该设备的请求序号（-1 = 任何）
+ * @seq: 该设备的分配序号（-1 = 无）。当设备被探测时，这会被设置，并且将在设备的 uclass 中是唯一的。
+ * @devres_head: 与此设备相关联的内存分配列表。
+ *   当启用 CONFIG_DEVRES 时，devm_kmalloc() 等将添加到此列表中。这样分配的内存将在设备被移除 / 解绑时自动释放。
  */
 struct udevice {
-	const struct driver *driver;
-	const char *name;
-	void *platdata;
-	void *parent_platdata;
-	void *uclass_platdata;
-	int of_offset;
-	ulong driver_data;
-	struct udevice *parent;
-	void *priv;
-	struct uclass *uclass;
-	void *uclass_priv;
-	void *parent_priv;
-	struct list_head uclass_node;
-	struct list_head child_head;
-	struct list_head sibling_node;
-	uint32_t flags;
-	int req_seq;
-	int seq;
+    const struct driver *driver;        /**< 该设备使用的驱动程序 */
+    const char *name;                   /**< 设备的名称，通常是 FDT 节点名称 */
+    void *platdata;                     /**< 该设备的配置数据 */
+    void *parent_platdata;              /**< 该设备的父总线的配置数据 */
+    void *uclass_platdata;              /**< 该设备的 uclass 的配置数据 */
+    int of_offset;                      /**< 该设备的设备树节点偏移量（- 表示没有） */
+    ulong driver_data;                  /**< 与该设备匹配的条目的驱动程序数据字 */
+    struct udevice *parent;             /**< 该设备的父级，对于顶级设备为 NULL */
+    void *priv;                         /**< 该设备的私有数据 */
+    struct uclass *uclass;              /**< 指向该设备的 uclass */
+    void *uclass_priv;                  /**< 该设备的 uclass 的私有数据 */
+    void *parent_priv;                  /**< 该设备的父级的私有数据 */
+    struct list_head uclass_node;       /**< uclass 用于链接其设备的节点 */
+    struct list_head child_head;        /**< 该设备的子设备列表 */
+    struct list_head sibling_node;      /**< 所有设备列表中的下一个设备 */
+    uint32_t flags;                     /**< 该设备的标志 DM_FLAG_... */
+    int req_seq;                        /**< 该设备的请求序号（-1 = 任何） */
+    int seq;                            /**< 该设备的分配序号（-1 = 无）。当设备被探测时，这会被设置，并且将在设备的 uclass 中是唯一的。 */
 #ifdef CONFIG_DEVRES
-	struct list_head devres_head;
+    struct list_head devres_head;
 #endif
 };
 
@@ -133,50 +124,36 @@ struct udevice_id {
 #endif /* CONFIG_IS_ENABLED(OF_CONTROL) */
 
 /**
- * struct driver - A driver for a feature or peripheral
+ * struct driver - 用于特性或外设的驱动程序
  *
- * This holds methods for setting up a new device, and also removing it.
- * The device needs information to set itself up - this is provided either
- * by platdata or a device tree node (which we find by looking up
- * matching compatible strings with of_match).
+ * 这个结构体保存了设置新设备和删除设备的方法。
+ * 设备需要信息来设置自身 - 这些信息由 platdata 或设备树节点提供
+ * （我们通过查找与 of_match 匹配的兼容字符串找到这些信息）。
  *
- * Drivers all belong to a uclass, representing a class of devices of the
- * same type. Common elements of the drivers can be implemented in the uclass,
- * or the uclass can provide a consistent interface to the drivers within
- * it.
+ * 所有驱动程序都属于一个 uclass，表示相同类型的设备的类别。
+ * 驱动程序的公共元素可以在 uclass 中实现，或者 uclass 可以为其中的驱动程序提供一致的接口。
  *
- * @name: Device name
- * @id: Identiies the uclass we belong to
- * @of_match: List of compatible strings to match, and any identifying data
- * for each.
- * @bind: Called to bind a device to its driver
- * @probe: Called to probe a device, i.e. activate it
- * @remove: Called to remove a device, i.e. de-activate it
- * @unbind: Called to unbind a device from its driver
- * @ofdata_to_platdata: Called before probe to decode device tree data
- * @child_post_bind: Called after a new child has been bound
- * @child_pre_probe: Called before a child device is probed. The device has
- * memory allocated but it has not yet been probed.
- * @child_post_remove: Called after a child device is removed. The device
- * has memory allocated but its device_remove() method has been called.
- * @priv_auto_alloc_size: If non-zero this is the size of the private data
- * to be allocated in the device's ->priv pointer. If zero, then the driver
- * is responsible for allocating any data required.
- * @platdata_auto_alloc_size: If non-zero this is the size of the
- * platform data to be allocated in the device's ->platdata pointer.
- * This is typically only useful for device-tree-aware drivers (those with
- * an of_match), since drivers which use platdata will have the data
- * provided in the U_BOOT_DEVICE() instantiation.
- * @per_child_auto_alloc_size: Each device can hold private data owned by
- * its parent. If required this will be automatically allocated if this
- * value is non-zero.
- * @per_child_platdata_auto_alloc_size: A bus likes to store information about
- * its children. If non-zero this is the size of this data, to be allocated
- * in the child's parent_platdata pointer.
- * @ops: Driver-specific operations. This is typically a list of function
- * pointers defined by the driver, to implement driver functions required by
- * the uclass.
- * @flags: driver flags - see DM_FLAGS_...
+ * @name: 设备名称
+ * @id: 标识我们所属的 uclass
+ * @of_match: 要匹配的兼容字符串列表，以及每个字符串的任何标识数据
+ * @bind: 绑定设备到其驱动程序时调用
+ * @probe: 探测设备，即激活设备时调用
+ * @remove: 移除设备，即去激活设备时调用
+ * @unbind: 解绑设备和其驱动程序时调用
+ * @ofdata_to_platdata: 在探测之前调用以解码设备树数据
+ * @child_post_bind: 在绑定新子设备后调用
+ * @child_pre_probe: 在探测子设备之前调用。该设备已分配内存，但尚未探测。
+ * @child_post_remove: 在移除子设备后调用。该设备已分配内存，但其 device_remove() 方法已被调用。
+ * @priv_auto_alloc_size: 如果非零，则这是在设备的 ->priv 指针中分配的私有数据的大小。
+ *   如果为零，则驱动程序负责分配所需的任何数据。
+ * @platdata_auto_alloc_size: 如果非零，则这是在设备的 ->platdata 指针中分配的平台数据的大小。
+ *   这通常只对设备树感知的驱动程序（具有 of_match 的驱动程序）有用，
+ *   因为使用 platdata 的驱动程序将在 U_BOOT_DEVICE() 实例化中提供数据。
+ * @per_child_auto_alloc_size: 每个设备可以持有其父级拥有的私有数据。如果需要，如果此值非零，则将自动分配。
+ * @per_child_platdata_auto_alloc_size: 总线喜欢存储有关其子设备的信息。
+ *   如果非零，则这是该数据的大小，要分配到子设备的 parent_platdata 指针中。
+ * @ops: 驱动程序特定的操作。这通常是由驱动程序定义的函数指针列表，用于实现 uclass 所需的驱动程序功能。
+ * @flags: 驱动程序标志 - 请参阅 DM_FLAGS_...
  */
 struct driver {
 	char *name;

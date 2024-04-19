@@ -128,23 +128,26 @@ int dm_init(void)
 {
 	int ret;
 
+	/* 判断根设备的udevice是否存在 */
 	if (gd->dm_root) {
 		dm_warn("Virtual root driver already exists!\n");
 		return -EINVAL;
 	}
-	INIT_LIST_HEAD(&DM_UCLASS_ROOT_NON_CONST);
+	INIT_LIST_HEAD(&DM_UCLASS_ROOT_NON_CONST); /* 初始化设备列表 */
 
 #if defined(CONFIG_NEEDS_MANUAL_RELOC)
 	fix_drivers();
 	fix_uclass();
 #endif
-
+	/* 创建root设备的udivice，将其与root设备的driver绑定 */
+	/* root设备的driver 只有name，没有实现 */
 	ret = device_bind_by_name(NULL, false, &root_info, &DM_ROOT_NON_CONST);
 	if (ret)
 		return ret;
 #if CONFIG_IS_ENABLED(OF_CONTROL)
 	DM_ROOT_NON_CONST->of_offset = 0;
 #endif
+	/* probe root设备 */
 	ret = device_probe(DM_ROOT_NON_CONST);
 	if (ret)
 		return ret;

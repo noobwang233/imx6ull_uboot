@@ -30,32 +30,32 @@ int device_bind(struct udevice *parent, const struct driver *drv,
 		const char *name, void *platdata, int of_offset,
 		struct udevice **devp)
 {
-	struct udevice *dev;
-	struct uclass *uc;
+	struct udevice *dev;   	//udevice指针，需要动态分配空间
+	struct uclass *uc;		//uclass指针
 	int size, ret = 0;
 
-	if (devp)
+	if (devp)				//如果devp不为NULL,则用其保存最后udevice指针
 		*devp = NULL;
 	if (!name)
 		return -EINVAL;
 
-	ret = uclass_get(drv->id, &uc);
+	ret = uclass_get(drv->id, &uc);	//获取driver对应的uclass
 	if (ret) {
 		debug("Missing uclass for driver %s\n", drv->name);
 		return ret;
 	}
 
-	dev = calloc(1, sizeof(struct udevice));
+	dev = calloc(1, sizeof(struct udevice));   //分配udevice的空间
 	if (!dev)
 		return -ENOMEM;
-
+	//初始化udevice的三个列表
 	INIT_LIST_HEAD(&dev->sibling_node);
 	INIT_LIST_HEAD(&dev->child_head);
 	INIT_LIST_HEAD(&dev->uclass_node);
 #ifdef CONFIG_DEVRES
 	INIT_LIST_HEAD(&dev->devres_head);
 #endif
-	dev->platdata = platdata;
+	dev->platdata = platdata;	//平台配置数据
 	dev->name = name;
 	dev->of_offset = of_offset;
 	dev->parent = parent;
@@ -66,11 +66,9 @@ int device_bind(struct udevice *parent, const struct driver *drv,
 	dev->req_seq = -1;
 	if (CONFIG_IS_ENABLED(OF_CONTROL) && CONFIG_IS_ENABLED(DM_SEQ_ALIAS)) {
 		/*
-		* Some devices, such as a SPI bus, I2C bus and serial ports
-		* are numbered using aliases.
+		* 一些设备，例如 SPI 总线、I2C 总线和串口端口等，使用别名进行编号。
 		*
-		* This is just a 'requested' sequence, and will be
-		* resolved (and ->seq updated) when the device is probed.
+		* 这只是一个“请求”的序列，在设备探测时将被解析（并更新 ->seq）。
 		*/
 		if (uc->uc_drv->flags & DM_UC_FLAG_SEQ_ALIAS) {
 			if (uc->uc_drv->name && of_offset != -1) {
@@ -80,7 +78,7 @@ int device_bind(struct udevice *parent, const struct driver *drv,
 			}
 		}
 	}
-
+	//分配平台数据空间
 	if (!dev->platdata && drv->platdata_auto_alloc_size) {
 		dev->flags |= DM_FLAG_ALLOC_PDATA;
 		dev->platdata = calloc(1, drv->platdata_auto_alloc_size);
@@ -89,7 +87,7 @@ int device_bind(struct udevice *parent, const struct driver *drv,
 			goto fail_alloc1;
 		}
 	}
-
+	//分配该uclass的平台数据
 	size = uc->uc_drv->per_device_platdata_auto_alloc_size;
 	if (size) {
 		dev->flags |= DM_FLAG_ALLOC_UCLASS_PDATA;
@@ -99,7 +97,7 @@ int device_bind(struct udevice *parent, const struct driver *drv,
 			goto fail_alloc2;
 		}
 	}
-
+	//分配该父设备的私有的数据空间
 	if (parent) {
 		size = parent->driver->per_child_platdata_auto_alloc_size;
 		if (!size) {
@@ -239,7 +237,7 @@ int device_probe(struct udevice *dev)
 	drv = dev->driver;
 	assert(drv);
 
-	/* Allocate private data if requested and not reentered */
+	/* 如果请求了私有数据且未重新进入，则分配私有数据 */
 	if (drv->priv_auto_alloc_size && !dev->priv) {
 		dev->priv = alloc_priv(drv->priv_auto_alloc_size, drv->flags);
 		if (!dev->priv) {
@@ -257,7 +255,7 @@ int device_probe(struct udevice *dev)
 		}
 	}
 
-	/* Ensure all parents are probed */
+	/* 确保所有父设备都被probe */
 	if (dev->parent) {
 		size = dev->parent->driver->per_child_auto_alloc_size;
 		if (!size) {
@@ -277,11 +275,9 @@ int device_probe(struct udevice *dev)
 			goto fail;
 
 		/*
-		 * The device might have already been probed during
-		 * the call to device_probe() on its parent device
-		 * (e.g. PCI bridge devices). Test the flags again
-		 * so that we don't mess up the device.
-		 */
+		* 设备可能在其父设备的 device_probe() 调用期间已经被探测过
+		* (例如，PCI 桥设备)。再次测试标志，以免破坏设备。
+		*/
 		if (dev->flags & DM_FLAG_ACTIVATED)
 			return 0;
 	}

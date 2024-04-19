@@ -601,19 +601,16 @@ int fdtdec_add_aliases_for_id(const void *blob, const char *name,
 			enum fdt_compat_id id, int *node_list, int maxcount);
 
 /**
- * Get the alias sequence number of a node
+ * 获取节点的别名序列号
  *
- * This works out whether a node is pointed to by an alias, and if so, the
- * sequence number of that alias. Aliases are of the form <base><num> where
- * <num> is the sequence number. For example spi2 would be sequence number
- * 2.
+ * 这个函数用于确定一个节点是否由别名指向，如果是，则返回该别名的序列号。
+ * 别名的格式为 <base><num>，其中 <num> 是序列号。例如 spi2 将是序列号 2。
  *
- * @param blob		Device tree blob (if NULL, then error is returned)
- * @param base		Base name for alias (before the underscore)
- * @param node		Node to look up
- * @param seqp		This is set to the sequence number if one is found,
- *			but otherwise the value is left alone
- * @return 0 if a sequence was found, -ve if not
+ * @param blob		设备树 blob（如果为 NULL，则返回错误）
+ * @param base		别名的基本名称（下划线前面的部分）
+ * @param node		要查找的节点
+ * @param seqp		如果找到序列号，则设置为该序列号，否则保持原样
+ * @return 如果找到序列号，则返回 0，否则返回负值
  */
 int fdtdec_get_alias_seq(const void *blob, const char *base, int node,
 			 int *seqp);

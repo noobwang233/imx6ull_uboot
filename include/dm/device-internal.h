@@ -14,54 +14,45 @@
 struct udevice;
 
 /**
- * device_bind() - Create a device and bind it to a driver
+ * device_bind() - 创建一个设备并将其绑定到一个驱动程序
  *
- * Called to set up a new device attached to a driver. The device will either
- * have platdata, or a device tree node which can be used to create the
- * platdata.
+ * 用于设置一个附加到驱动程序的新设备。设备将具有platdata或设备树节点，该节点可用于创建platdata。
  *
- * Once bound a device exists but is not yet active until device_probe() is
- * called.
+ * 绑定后，设备存在但尚未激活，直到调用device_probe()为止。
  *
- * @parent: Pointer to device's parent, under which this driver will exist
- * @drv: Device's driver
- * @name: Name of device (e.g. device tree node name)
- * @platdata: Pointer to data for this device - the structure is device-
- * specific but may include the device's I/O address, etc.. This is NULL for
- * devices which use device tree.
- * @of_offset: Offset of device tree node for this device. This is -1 for
- * devices which don't use device tree.
- * @devp: if non-NULL, returns a pointer to the bound device
- * @return 0 if OK, -ve on error
+ * @parent: 指向设备父级的指针，该驱动程序将存在于其下
+ * @drv: 设备的驱动程序
+ * @name: 设备的名称（例如，设备树节点名称）
+ * @platdata: 指向此设备的数据的指针 - 结构是设备特定的，但可能包括设备的I/O地址等。对于使用设备树的设备，此值为NULL。
+ * @of_offset: 此设备的设备树节点的偏移量。对于不使用设备树的设备，此值为-1。
+ * @devp: 如果非空，则返回指向绑定设备的指针
+ * @return: 如果成功返回0，否则返回负值错误码
  */
 int device_bind(struct udevice *parent, const struct driver *drv,
 		const char *name, void *platdata, int of_offset,
 		struct udevice **devp);
 
 /**
- * device_bind_by_name: Create a device and bind it to a driver
+ * device_bind_by_name: 创建一个设备并将其绑定到一个驱动程序
  *
- * This is a helper function used to bind devices which do not use device
- * tree.
+ * 这是一个用于绑定不使用设备树的设备的辅助函数。
  *
- * @parent: Pointer to device's parent
- * @pre_reloc_only: If true, bind the driver only if its DM_INIT_F flag is set.
- * If false bind the driver always.
- * @info: Name and platdata for this device
- * @devp: if non-NULL, returns a pointer to the bound device
- * @return 0 if OK, -ve on error
+ * @parent: 指向设备父级的指针
+ * @pre_reloc_only: 如果为true，则仅在其DM_INIT_F标志被设置时绑定驱动程序。如果为false，则始终绑定驱动程序。
+ * @info: 此设备的名称和platdata
+ * @devp: 如果非空，则返回指向绑定设备的指针
+ * @return: 如果成功返回0，否则返回负值错误码
  */
 int device_bind_by_name(struct udevice *parent, bool pre_reloc_only,
 			const struct driver_info *info, struct udevice **devp);
 
 /**
- * device_probe() - Probe a device, activating it
+ * device_probe() - 探测设备，激活它
  *
- * Activate a device so that it is ready for use. All its parents are probed
- * first.
+ * 激活设备以使其准备好使用。首先探测所有的父级设备。
  *
- * @dev: Pointer to device to probe
- * @return 0 if OK, -ve on error
+ * @dev: 指向要探测的设备的指针
+ * @return: 如果成功返回0，否则返回负值错误码
  */
 int device_probe(struct udevice *dev);
 
