@@ -22,53 +22,43 @@
 #if !defined(__ASSEMBLY__)
 
 /**
- * A linker list is constructed by grouping together linker input
- * sections, each containing one entry of the list. Each input section
- * contains a constant initialized variable which holds the entry's
- * content. Linker list input sections are constructed from the list
- * and entry names, plus a prefix which allows grouping all lists
- * together. Assuming _list and _entry are the list and entry names,
- * then the corresponding input section name is
+ * 链接器列表是通过将链接器输入节分组而构建的，每个节包含列表的一个条目。每个输入节
+ * 包含一个常量初始化的变量，该变量保存条目的内容。链接器列表输入节是从列表和条目名称，
+ * 加上一个前缀，构建的，该前缀允许将所有列表组合在一起。假设_list和_entry是列表和条目名
+ * 称，则相应的输入节名称是
  *
  *   .u_boot_list_ + 2_ + @_list + _2_ + @_entry
  *
- * and the C variable name is
+ * 而C变量名称是
  *
  *   _u_boot_list + _2_ + @_list + _2_ + @_entry
  *
- * This ensures uniqueness for both input section and C variable name.
+ * 这确保了输入节和C变量名称的唯一性。
  *
- * Note that the names differ only in the first character, "." for the
- * section and "_" for the variable, so that the linker cannot confuse
- * section and symbol names. From now on, both names will be referred
- * to as
+ * 注意，名称仅在第一个字符上有所不同，即节的名称为"."，变量的名称为"_"，因此链接器不会
+ * 混淆节和符号名称。从现在开始，两个名称将被称为
  *
  *   %u_boot_list_ + 2_ + @_list + _2_ + @_entry
  *
- * Entry variables need never be referred to directly.
+ * 条目变量永远不需要直接引用。
  *
- * The naming scheme for input sections allows grouping all linker lists
- * into a single linker output section and grouping all entries for a
- * single list.
+ * 输入节的命名方案允许将所有链接器列表分组到单个链接器输出节中，并将所有单个列表的条目
+ * 分组。
  *
- * Note the two '_2_' constant components in the names: their presence
- * allows putting a start and end symbols around a list, by mapping
- * these symbols to sections names with components "1" (before) and
- * "3" (after) instead of "2" (within).
- * Start and end symbols for a list can generally be defined as
+ * 请注意名称中的两个'_2_'常量组件：它们的存在允许将起始符号和结束符号放置在列表周围，方法
+ * 是将这些符号映射到具有组件"1"（之前）和"3"（之后）而不是"2"（在内部）的节名称。列表的
+ * 起始和结束符号通常可以定义为
  *
  *   %u_boot_list_2_ + @_list + _1_...
  *   %u_boot_list_2_ + @_list + _3_...
  *
- * Start and end symbols for the whole of the linker lists area can be
- * defined as
+ * 链接器列表区域的整个起始和结束符号可以定义为
  *
  *   %u_boot_list_1_...
  *   %u_boot_list_3_...
  *
- * Here is an example of the sorted sections which result from a list
- * "array" made up of three entries : "first", "second" and "third",
- * iterated at least once.
+ * 这是一个示例，显示了由三个条目“first”、“second”和“third”组成的列表“array”所产生的排
+ * 序节。
  *
  *   .u_boot_list_2_array_1
  *   .u_boot_list_2_array_2_first
@@ -76,16 +66,12 @@
  *   .u_boot_list_2_array_2_third
  *   .u_boot_list_2_array_3
  *
- * If lists must be divided into sublists (e.g. for iterating only on
- * part of a list), one can simply give the list a name of the form
- * 'outer_2_inner', where 'outer' is the global list name and 'inner'
- * is the sub-list name. Iterators for the whole list should use the
- * global list name ("outer"); iterators for only a sub-list should use
- * the full sub-list name ("outer_2_inner").
+ * 如果列表必须分为子列表（例如，仅对列表的一部分进行迭代），可以简单地给出形式为'outer_2_
+ * inner'的列表名称，其中'outer'是全局列表名称，'inner'是子列表名称。整个列表的迭代器应该使
+ * 用全局列表名称（"outer"）；仅子列表的迭代器应该使用完整的子列表名称（"outer_2_inner"）。
  *
- * Here is an example of the sections generated from a global list
- * named "drivers", two sub-lists named "i2c" and "pci", and iterators
- * defined for the whole list and each sub-list:
+ * 下面是从名为"drivers"的全局列表生成的节的示例，以及名为"i2c"和"pci"的两个子列表，并为整
+ * 个列表和每个子列表定义的迭代器：
  *
  *   %u_boot_list_2_drivers_1
  *   %u_boot_list_2_drivers_2_i2c_1

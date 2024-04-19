@@ -54,9 +54,9 @@ ENTRY(relocate_vectors)
 	ands	r2, r2, #(1 << 13)
 	ldreq	r1, =0x00000000		/* If V=0 */
 	ldrne	r1, =0xFFFF0000		/* If V=1 */
-	ldmia	r0!, {r2-r8,r10}
+	ldmia	r0!, {r2-r8,r10}	/* 拷贝异常向量表，一次拷贝8 * 32 bit */
 	stmia	r1!, {r2-r8,r10}
-	ldmia	r0!, {r2-r8,r10}
+	ldmia	r0!, {r2-r8,r10}	/* 拷贝两次 */
 	stmia	r1!, {r2-r8,r10}
 #endif
 #endif
@@ -78,34 +78,35 @@ ENDPROC(relocate_vectors)
 
 ENTRY(relocate_code)
 	ldr	r1, =__image_copy_start	/* r1 <- SRC &__image_copy_start */
-	subs	r4, r0, r1		/* r4 <- relocation offset */
-	beq	relocate_done		/* skip relocation */
+	subs	r4, r0, r1			/* r4 为r0 -r1，即重定位之后相对于现在的地址偏移 offset */
+	beq	relocate_done			/* 如果r0 == r1,则表示不需要重定位，跳转到relocate_done */
 	ldr	r2, =__image_copy_end	/* r2 <- SRC &__image_copy_end */
 
 copy_loop:
 	ldmia	r1!, {r10-r11}		/* copy from source address [r1]    */
 	stmia	r0!, {r10-r11}		/* copy to   target address [r0]    */
-	cmp	r1, r2			/* until source end address [r2]    */
+	cmp	r1, r2					/* until source end address [r2]    */
 	blo	copy_loop
 
 	/*
 	 * fix .rel.dyn relocations
+	 * .rel.dyn段是存放 .text段中需要重定位地址的集合
 	 */
 	ldr	r2, =__rel_dyn_start	/* r2 <- SRC &__rel_dyn_start */
-	ldr	r3, =__rel_dyn_end	/* r3 <- SRC &__rel_dyn_end */
+	ldr	r3, =__rel_dyn_end		/* r3 <- SRC &__rel_dyn_end */
 fixloop:
 	ldmia	r2!, {r0-r1}		/* (r0,r1) <- (SRC location,fixup) */
 	and	r1, r1, #0xff
-	cmp	r1, #23			/* relative fixup? */
-	bne	fixnext
+	cmp	r1, #23					/* 是否为0x17，Label地址标识 relative fixup? */
+	bne	fixnext					/* 不是则跳过 */
 
 	/* relative fix: increase location by offset */
-	add	r0, r0, r4
+	add	r0, r0, r4				/* Label 加上重定位偏移量 */
 	ldr	r1, [r0]
-	add	r1, r1, r4
+	add	r1, r1, r4				/* Label 处保存的地址也加上重定位偏移量 */
 	str	r1, [r0]
 fixnext:
-	cmp	r2, r3
+	cmp	r2, r3					/* 查看 .rel.dyn段重定位是否完成 */
 	blo	fixloop
 
 relocate_done:

@@ -3198,7 +3198,7 @@ static int parse_stream_outer(struct in_str *inp, int flag)
 		if (!(flag & FLAG_PARSE_SEMICOLON) || (flag & FLAG_REPARSING)) mapset((uchar *)";$&|", 0);
 		inp->promptmode=1;
 		rcode = parse_stream(&temp, &ctx, inp,
-				     flag & FLAG_CONT_ON_NEWLINE ? -1 : '\n');
+				     flag & FLAG_CONT_ON_NEWLINE ? -1 : '\n'); // 命令解析
 #ifdef __U_BOOT__
 		if (rcode == 1) flag_repeat = 0;
 #endif
@@ -3214,7 +3214,7 @@ static int parse_stream_outer(struct in_str *inp, int flag)
 #ifndef __U_BOOT__
 			run_list(ctx.list_head);
 #else
-			code = run_list(ctx.list_head);
+			code = run_list(ctx.list_head);				//执行命令
 			if (code == -2) {	/* exit */
 				b_free(&temp);
 				code = 0;
@@ -3295,8 +3295,12 @@ int parse_file_outer(void)
 #ifndef __U_BOOT__
 	setup_file_in_str(&input, f);
 #else
-	setup_file_in_str(&input);
+	setup_file_in_str(&input); //初始化变量 input的成员变量
 #endif
+/*
+ * 这个函数就是 hush shell的命令解释器，负责接收命令行输入，
+ * 然后解析并执行相应的命令，函数 parse_stream_outer定义在文件 common/cli_hush.c
+ */
 	rcode = parse_stream_outer(&input, FLAG_PARSE_SEMICOLON);
 	return rcode;
 }

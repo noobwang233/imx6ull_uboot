@@ -1888,14 +1888,14 @@ int mmc_initialize(bd_t *bis)
 {
 	static int initialized = 0;
 	int ret;
-	if (initialized)	/* Avoid initializing mmc multiple times */
+	if (initialized)	/* 防止重复初始化 */
 		return 0;
 	initialized = 1;
 
-	INIT_LIST_HEAD (&mmc_devices);
+	INIT_LIST_HEAD (&mmc_devices);//mmc设备列表初始化
 	cur_dev_num = 0;
 
-	ret = mmc_probe(bis);
+	ret = mmc_probe(bis);/* mmc 设备与驱动配对 */
 	if (ret)
 		return ret;
 

@@ -201,7 +201,7 @@ err:
 
 void cli_loop(void)
 {
-#ifdef CONFIG_SYS_HUSH_PARSER
+#ifdef CONFIG_SYS_HUSH_PARSER	//启用 Hush shell 的解析器
 	parse_file_outer();
 	/* This point is never reached */
 	for (;;);
@@ -212,7 +212,7 @@ void cli_loop(void)
 
 void cli_init(void)
 {
-#ifdef CONFIG_SYS_HUSH_PARSER
+#ifdef CONFIG_SYS_HUSH_PARSER  //启用 Hush shell 的解析器
 	u_boot_hush_start();
 #endif
 

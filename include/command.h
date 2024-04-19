@@ -28,14 +28,14 @@
  */
 
 struct cmd_tbl_s {
-	char		*name;		/* Command Name			*/
-	int		maxargs;	/* maximum number of arguments	*/
-	int		repeatable;	/* autorepeat allowed?		*/
-					/* Implementation function	*/
+	char		*name;			/* Command Name			*/
+	int		maxargs;			/* maximum number of arguments	*/
+	int		repeatable;			/* autorepeat allowed?		*/
+								/* Implementation function	*/
 	int		(*cmd)(struct cmd_tbl_s *, int, int, char * const []);
-	char		*usage;		/* Usage message	(short)	*/
+	char		*usage;			/* Usage message	(short)	*/
 #ifdef	CONFIG_SYS_LONGHELP
-	char		*help;		/* Help  message	(long)	*/
+	char		*help;			/* Help  message	(long)	*/
 #endif
 #ifdef CONFIG_AUTO_COMPLETE
 	/* do auto completion on the arguments */

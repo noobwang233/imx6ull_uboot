@@ -117,9 +117,9 @@ cmd_tbl_t *find_cmd_tbl(const char *cmd, cmd_tbl_t *table, int table_len)
 
 cmd_tbl_t *find_cmd(const char *cmd)
 {
-	cmd_tbl_t *start = ll_entry_start(cmd_tbl_t, cmd);
-	const int len = ll_entry_count(cmd_tbl_t, cmd);
-	return find_cmd_tbl(cmd, start, len);
+	cmd_tbl_t *start = ll_entry_start(cmd_tbl_t, cmd);	//获取命令cmd的头地址
+	const int len = ll_entry_count(cmd_tbl_t, cmd);		//获取长度
+	return find_cmd_tbl(cmd, start, len);				//查找命令cmd对应的cmd_tbl_t结构体指针
 }
 
 int cmd_usage(const cmd_tbl_t *cmdtp)
@@ -477,15 +477,13 @@ void fixup_cmdtable(cmd_tbl_t *cmdtp, int size)
 #endif
 
 /**
- * Call a command function. This should be the only route in U-Boot to call
- * a command, so that we can track whether we are waiting for input or
- * executing a command.
+ * 调用一个命令函数。这应该是在U-Boot中调用命令的唯一途径，以便我们可以追踪是否在等待输入或执行命令。
  *
- * @param cmdtp		Pointer to the command to execute
- * @param flag		Some flags normally 0 (see CMD_FLAG_.. above)
- * @param argc		Number of arguments (arg 0 must be the command text)
- * @param argv		Arguments
- * @return 0 if command succeeded, else non-zero (CMD_RET_...)
+ * @param cmdtp     指向要执行的命令的指针
+ * @param flag      一些标志，通常为0（参见上面的CMD_FLAG_..）
+ * @param argc      参数的个数（第一个参数是命令文本）
+ * @param argv      参数数组，包含命令及其参数的字符串
+ * @return          如果命令执行成功，则返回0；否则返回非零值（CMD_RET_...）
  */
 static int cmd_call(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
@@ -497,22 +495,33 @@ static int cmd_call(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return result;
 }
 
+/**
+ * 处理带有参数的命令。我们查找命令并执行它（如果有效）。否则，我们打印使用消息。
+ *
+ * @param flag      一些标志，通常为0（参见上面的CMD_FLAG_..）
+ * @param argc      参数的个数（第一个参数是命令文本）
+ * @param argv      参数数组，包含命令及其参数的字符串
+ * @param repeatable    如果命令是可重复执行的，则此函数将其设置为0；否则保持不变
+ * @param ticks     如果ticks不为null，则此函数将其设置为命令执行所花费的时钟周期数
+ *
+ * @return          如果命令执行成功，则返回0；如果命令执行失败，则返回1
+ */
 enum command_ret_t cmd_process(int flag, int argc, char * const argv[],
 			       int *repeatable, ulong *ticks)
 {
 	enum command_ret_t rc = CMD_RET_SUCCESS;
 	cmd_tbl_t *cmdtp;
 
-	/* Look up command in command table */
+	/* 在命令列表里查找命令 */
 	cmdtp = find_cmd(argv[0]);
 	if (cmdtp == NULL) {
 		printf("Unknown command '%s' - try 'help'\n", argv[0]);
 		return 1;
 	}
 
-	/* found - check max args */
+	/* 确认参数个数 */
 	if (argc > cmdtp->maxargs)
-		rc = CMD_RET_USAGE;
+		rc = CMD_RET_USAGE;//参数个数超过最大参数个数，返回值设为CMD_RET_USAGE
 
 #if defined(CONFIG_CMD_BOOTD)
 	/* avoid "bootd" recursion */
@@ -526,17 +535,17 @@ enum command_ret_t cmd_process(int flag, int argc, char * const argv[],
 	}
 #endif
 
-	/* If OK so far, then do the command */
+	/* 到目前位置正确，就执行命令 */
 	if (!rc) {
+		if (ticks) 								//ticks不为NULL,则将任务执行所需的tick赋值给他
+			*ticks = get_timer(0);				//get_ms_timer() - base，获取从0开始的tick
+		rc = cmd_call(cmdtp, flag, argc, argv);	//执行命令，执行的返回值赋值为rc
 		if (ticks)
-			*ticks = get_timer(0);
-		rc = cmd_call(cmdtp, flag, argc, argv);
-		if (ticks)
-			*ticks = get_timer(*ticks);
-		*repeatable &= cmdtp->repeatable;
+			*ticks = get_timer(*ticks);			//计算出任务执行所需的tick
+		*repeatable &= cmdtp->repeatable;		//获取任务结构体cmdtp的repeatable
 	}
-	if (rc == CMD_RET_USAGE)
-		rc = cmd_usage(cmdtp);
+	if (rc == CMD_RET_USAGE)					//需要打印用法
+		rc = cmd_usage(cmdtp);					//打印用法
 	return rc;
 }
 

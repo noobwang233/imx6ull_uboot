@@ -1,9 +1,5 @@
 /*
  *  crt0 - C-runtime startup Code for ARM U-Boot
- *
- *  Copyright (c) 2012  Albert ARIBAUD <albert.u.boot@aribaud.net>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
@@ -14,50 +10,39 @@
 #endif
 
 /*
- * This file handles the target-independent stages of the U-Boot
- * start-up where a C runtime environment is needed. Its entry point
- * is _main and is branched into from the target's start.S file.
+ * 此文件处理 U-Boot 启动的与目标无关的阶段，其中需要 C 运行时环境。
+ * 其入口点为 _main，并从目标的 start.S 文件分支到此处。
  *
- * _main execution sequence is:
+ * _main 执行顺序如下：
  *
- * 1. Set up initial environment for calling board_init_f().
- *    This environment only provides a stack and a place to store
- *    the GD ('global data') structure, both located in some readily
- *    available RAM (SRAM, locked cache...). In this context, VARIABLE
- *    global data, initialized or not (BSS), are UNAVAILABLE; only
- *    CONSTANT initialized data are available. GD should be zeroed
- *    before board_init_f() is called.
+ * 1. 设置用于调用 board_init_f() 的初始环境。
+ *    此环境仅提供堆栈和存储 GD（'global data'）结构的地方，
+ *    它们都位于一些可用的 RAM（SRAM、锁定缓存等）中。
+ *    在此上下文中，可变的全局数据（初始化或未初始化的 BSS）不可用；
+ *    仅可用常量初始化数据。在调用 board_init_f() 之前，GD 应清零。
  *
- * 2. Call board_init_f(). This function prepares the hardware for
- *    execution from system RAM (DRAM, DDR...) As system RAM may not
- *    be available yet, , board_init_f() must use the current GD to
- *    store any data which must be passed on to later stages. These
- *    data include the relocation destination, the future stack, and
- *    the future GD location.
+ * 2. 调用 board_init_f()。此函数准备硬件以执行从系统 RAM（DRAM、DDR...）中执行。
+ *    由于系统 RAM 可能尚不可用，board_init_f() 必须使用当前的 GD 来存储必须传递到后续阶段的任何数据。
+ *    这些数据包括重定位目的地、未来的堆栈和未来的 GD 位置。
  *
- * 3. Set up intermediate environment where the stack and GD are the
- *    ones allocated by board_init_f() in system RAM, but BSS and
- *    initialized non-const data are still not available.
+ * 3. 设置中间环境，其中堆栈和 GD 是由 board_init_f() 在系统 RAM 中分配的，
+ *    但是 BSS 和初始化的非常量数据仍然不可用。
  *
- * 4a.For U-Boot proper (not SPL), call relocate_code(). This function
- *    relocates U-Boot from its current location into the relocation
- *    destination computed by board_init_f().
+ * 4a. 对于 U-Boot 本身（不是 SPL），调用 relocate_code()。
+ *     此函数将 U-Boot 从当前位置重新定位到由 board_init_f() 计算的重定位目的地。
  *
- * 4b.For SPL, board_init_f() just returns (to crt0). There is no
- *    code relocation in SPL.
+ * 4b. 对于 SPL，board_init_f() 仅返回（到 crt0）。在 SPL 中没有代码重定位。
  *
- * 5. Set up final environment for calling board_init_r(). This
- *    environment has BSS (initialized to 0), initialized non-const
- *    data (initialized to their intended value), and stack in system
- *    RAM (for SPL moving the stack and GD into RAM is optional - see
- *    CONFIG_SPL_STACK_R). GD has retained values set by board_init_f().
+ * 5. 为调用 board_init_r() 设置最终环境。
+ *    此环境具有 BSS（初始化为 0）、初始化的非常量数据（初始化为它们的预期值），
+ *    以及系统 RAM 中的堆栈（对于将堆栈和 GD 移入 RAM 的 SPL 是可选的 - 请参见 CONFIG_SPL_STACK_R）。
+ *    GD 保留了由 board_init_f() 设置的值。
  *
- * 6. For U-Boot proper (not SPL), some CPUs have some work left to do
- *    at this point regarding memory, so call c_runtime_cpu_setup.
+ * 6. 对于 U-Boot 本身（不是 SPL），在此时一些 CPU 可能还有一些与内存有关的工作要做，因此调用 c_runtime_cpu_setup。
  *
- * 7. Branch to board_init_r().
+ * 7. 分支到 board_init_r()。
  *
- * For more information see 'Board Initialisation Flow in README.
+ * 有关更多信息，请参阅 README 中的 'Board Initialisation Flow'。
  */
 
 /*
@@ -111,13 +96,20 @@ ENTRY(_main)
 	ldr	r9, [r9, #GD_BD]		/* r9 = gd->bd */
 	sub	r9, r9, #GD_SIZE		/* new GD is below bd */
 
-	adr	lr, here
+	adr	lr, here				/*将当前地址（here）加载到链接寄存器（lr）中*/
 	ldr	r0, [r9, #GD_RELOC_OFF]		/* r0 = gd->reloc_off */
-	add	lr, lr, r0
+	add	lr, lr, r0				/*将lr中的地址偏移，这样的话返回的时候就是重定位之后的地址了*/
+/*
+ * lr寄存器的值加上 r0寄存器的值，重新赋值给 lr寄存器。因为接下来要重定位
+ * 代码，也就是把代码拷贝到新的地方去 (现在的 uboot存放的起始地址为 0X87800000，下面要
+ * 将 uboot拷贝到 DDR最后面的地址空间出，将 0X87800000开始的内存空出来 )，其中就包括
+ * here，因此 lr中的 here要使用重定位后的位置。
+ */
+
 #if defined(CONFIG_CPU_V7M)
 	orr	lr, #1				/* As required by Thumb-only */
 #endif
-	ldr	r0, [r9, #GD_RELOCADDR]		/* r0 = gd->relocaddr */
+	ldr	r0, [r9, #GD_RELOCADDR]		/* r0 = gd->relocaddr，gd->relocaddr为重定位后uboot的首地址 */
 	b	relocate_code
 here:
 /*

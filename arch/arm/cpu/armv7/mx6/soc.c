@@ -817,11 +817,12 @@ void s_init(void)
 	    is_cpu_type(MXC_CPU_MX6ULL) || is_cpu_type(MXC_CPU_MX6SLL))
 		return;
 
-	/* Due to hardware limitation, on MX6Q we need to gate/ungate all PFDs
-	 * to make sure PFD is working right, otherwise, PFDs may
-	 * not output clock after reset, MX6DL and MX6SL have added 396M pfd
-	 * workaround in ROM code, as bus clock need it
-	 */
+	/*
+	* 由于硬件限制，在 MX6Q 上，我们需要对所有 PFD 进行开关控制，
+	* 确保 PFD 正常工作，否则，在复位后，PFD 可能不会输出时钟，
+	* MX6DL 和 MX6SL 在 ROM 代码中添加了 396M PFD 解决方案，
+	* 因为总线时钟需要它
+	*/
 
 	mask480 = ANATOP_PFD_CLKGATE_MASK(0) |
 		ANATOP_PFD_CLKGATE_MASK(1) |

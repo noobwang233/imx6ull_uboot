@@ -33,27 +33,27 @@ save_boot_params_ret:
 	msr	cpsr,r0             // 将r0加载到cpsr, 生效配置
 
 /*
- * Setup vector:
- * (OMAP4 spl TEXT_BASE is not 32 byte aligned.
- * Continue to use ROM code vector only in OMAP4 spl)
+ * 设置异常向量：
+ * (OMAP4 spl 的 TEXT_BASE 不是 32 字节对齐的。
+ * 在 OMAP4 spl 中仅继续使用 ROM 代码的异常向量)
  */
 #if !(defined(CONFIG_OMAP44XX) && defined(CONFIG_SPL_BUILD))
 	/* Set V=0 in CP15 SCTLR register - for VBAR to point to vector */
 	mrc	p15, 0, r0, c1, c0, 0		//读取SCTLR(System control register)寄存器的值。
 
                                     // CR_V在 arch/arm/include/asm/system.h中有如下所示定义：#define CR_V (1 << 13)
-	bic	r0, #CR_V		@ V = 0 	//因此这一行的目的就是清除 SCTLR寄存器中的 bit13
-                                    //bit13为 V位，此位是向量表控制位，当为 0的时候向量表基地址为 0X00000000
-                                    //这里将 V清零，目的就是为了接下来的向量表重定位。
+	bic	r0, #CR_V		@ V = 0 	// 因此这一行的目的就是清除 SCTLR寄存器中的 bit13
+                                    // bit13为 V位，此位是向量表控制位，当为 0的时候向量表基地址为 0X00000000
+                                    // 这里将 V清零，目的就是为了接下来的向量表重定位。
 	
-    mcr	p15, 0, r0, c1, c0, 0		//Write CP15 SCTLR Register
+    mcr	p15, 0, r0, c1, c0, 0		// Write CP15 SCTLR Register
 
 	/* Set vector address in CP15 VBAR register */
-	ldr	r0, =_start					//将程序入口_start标号处的地址放入r0
-	mcr	p15, 0, r0, c12, c0, 0		//将r0寄存器的值 (向量表值 )写入到 CP15的 c12寄存器中，也就是 VBAR寄存器。
+	ldr	r0, =_start					// 将程序入口_start标号处的地址放入r0
+	mcr	p15, 0, r0, c12, c0, 0		// 将r0寄存器的值 (向量表值 )写入到 CP15的 c12寄存器中，也就是 VBAR寄存器。
 #endif
 
-	/* the mask ROM code should have PLL and others stable */
+	/* 如果跳过lowlevel init,则芯片内部的rom需要能够保证PLL等稳定 */
 #ifndef CONFIG_SKIP_LOWLEVEL_INIT
 	bl	cpu_init_cp15				//跳转到cpu_init_cp15，用来设置 CP15相关的内容，比如关闭 MMU啥的
 	bl	cpu_init_crit				//跳转到cpu_init_crit，内部仅仅是跳转到lowlevel_init
@@ -81,8 +81,8 @@ ENDPROC(c_runtime_cpu_setup)
  * void save_boot_params(u32 r0, u32 r1, u32 r2, u32 r3)
  *	__attribute__((weak));
  *
- * Stack pointer is not yet initialized at this moment
- * Don't save anything to stack even if compiled with -O0
+ * 此时堆栈指针尚未初始化
+ * 即使使用 -O0 编译也不要将任何内容保存到堆栈中
  *
  *************************************************************************/
 ENTRY(save_boot_params)
@@ -94,8 +94,7 @@ ENDPROC(save_boot_params)
  *
  * cpu_init_cp15
  *
- * Setup CP15 registers (cache, MMU, TLBs). The I-cache is turned on unless
- * CONFIG_SYS_ICACHE_OFF is defined.
+ * 设置 CP15 寄存器（缓存、MMU、TLB）。除非定义了 CONFIG_SYS_ICACHE_OFF，否则会打开 I-cache。
  *
  *************************************************************************/
 ENTRY(cpu_init_cp15)
@@ -249,17 +248,15 @@ ENDPROC(cpu_init_cp15)
  *
  * CPU_init_critical registers
  *
- * setup important registers
- * setup memory timing
+ * 设置关键寄存器
+ * 设置内存时序
  *
  *************************************************************************/
 ENTRY(cpu_init_crit)
 	/*
-	 * Jump to board specific initialization...
-	 * The Mask ROM will have already initialized
-	 * basic memory. Go here to bump up clock rate and handle
-	 * wake up conditions.
-	 */
+	* 跳转到板级特定的初始化代码...
+	* Mask ROM 已经初始化了基本内存。跳转到这里以提高时钟频率并处理唤醒条件。
+	*/
 	b	lowlevel_init		@ go setup pll,mux,memory
 ENDPROC(cpu_init_crit)
 #endif

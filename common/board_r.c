@@ -772,24 +772,24 @@ static int run_main_loop(void)
  */
 init_fnc_t init_sequence_r[] = {
 	initr_trace,
-	initr_reloc,
+	initr_reloc,	/* 函数用于设置 gd->flags，标记重定位完成 */
 	/* TODO: could x86/PPC have this also perhaps? */
 #ifdef CONFIG_ARM
-	initr_caches,
-	/* Note: For Freescale LS2 SoCs, new MMU table is created in DDR.
-	 *	 A temporary mapping of IFC high region is since removed,
-	 *	 so environmental variables in NOR flash is not availble
-	 *	 until board_init() is called below to remap IFC to high
-	 *	 region.
-	 */
+	initr_caches,	/* 函数用于初始化 cache，使能 cache */
+	/*
+	* 注意：对于 Freescale LS2 SoC，新的 MMU 表在 DDR 中创建。
+	*	 临时映射的 IFC 高区域已被移除，
+	*	 因此，在下面调用 board_init() 重新映射 IFC 到高区域之前，
+	*	 NOR flash 中的环境变量是不可用的。
+	*/
 #endif
-	initr_reloc_global_data,
+	initr_reloc_global_data,	/* 函数，初始化重定位后 gd的一些成员变量 */
 #if defined(CONFIG_SYS_INIT_RAM_LOCK) && defined(CONFIG_E500)
 	initr_unlock_ram_in_cache,
 #endif
 	initr_barrier,
-	initr_malloc,
-	initr_console_record,
+	initr_malloc,				/* 初始化malloc */
+	initr_console_record,		/* 初始化控制台记录 */
 #ifdef CONFIG_SYS_NONCACHED_MEMORY
 	initr_noncached,
 #endif
@@ -799,7 +799,7 @@ init_fnc_t init_sequence_r[] = {
 #endif
 	initr_bootstage,
 #if defined(CONFIG_ARM) || defined(CONFIG_NDS32)
-	board_init,	/* Setup chipselects */
+	board_init,					/* 板级初始化，包括 74XX芯片， I2C、 FEC、 USB和 QSPI等。定义在板级c文件中 */
 #endif
 	/*
 	 * TODO: printing of the clock inforamtion of the board is now
@@ -808,10 +808,10 @@ init_fnc_t init_sequence_r[] = {
 	 * implement this.
 	 */
 #ifdef CONFIG_CLOCKS
-	set_cpu_clk_info, /* Setup clock information */
+	set_cpu_clk_info, 			/* Setup clock information */
 #endif
-	stdio_init_tables,
-	initr_serial,
+	stdio_init_tables,			/* stdio相关初始化 */
+	initr_serial,				/* 函数，初始化串口 */
 	initr_announce,
 	INIT_FUNC_WATCHDOG_RESET
 #ifdef CONFIG_NEEDS_MANUAL_RELOC
@@ -850,9 +850,9 @@ init_fnc_t init_sequence_r[] = {
 #ifdef CONFIG_ARCH_EARLY_INIT_R
 	arch_early_init_r,
 #endif
-	power_init_board,
+	power_init_board,			/* 初始化电源芯片 */
 #ifndef CONFIG_SYS_NO_FLASH
-	initr_flash,
+	initr_flash,				/* 初始化flash */
 #endif
 	INIT_FUNC_WATCHDOG_RESET
 #if defined(CONFIG_PPC) || defined(CONFIG_M68K) || defined(CONFIG_X86) || \
@@ -864,23 +864,23 @@ init_fnc_t init_sequence_r[] = {
 	initr_spi,
 #endif
 #ifdef CONFIG_CMD_NAND
-	initr_nand,
+	initr_nand,					/* 初始化nand */
 #endif
 #ifdef CONFIG_CMD_ONENAND
 	initr_onenand,
 #endif
 #ifdef CONFIG_GENERIC_MMC
-	initr_mmc,
+	initr_mmc,					/* 初始化emmc */
 #endif
 #ifdef CONFIG_HAS_DATAFLASH
 	initr_dataflash,
 #endif
-	initr_env,
+	initr_env,					/* 初始化环境变量 */
 #ifdef CONFIG_SYS_BOOTPARAMS_LEN
 	initr_malloc_bootparams,
 #endif
 	INIT_FUNC_WATCHDOG_RESET
-	initr_secondary_cpu,
+	initr_secondary_cpu,		/* 初始化其他 CPU核 */
 #if defined(CONFIG_ID_EEPROM) || defined(CONFIG_SYS_I2C_MAC_OFFSET)
 	mac_read_from_eeprom,
 #endif
@@ -891,12 +891,12 @@ init_fnc_t init_sequence_r[] = {
 	 */
 	initr_pci,
 #endif
-	stdio_add_devices,
-	initr_jumptable,
+	stdio_add_devices,			/* 各种输入输出设备的初始化，如 LCD driver I.MX6ULL使用 drv_video_init函数初始化 LCD */
+	initr_jumptable,			/* 初始化跳转表 */
 #ifdef CONFIG_API
 	initr_api,
 #endif
-	console_init_r,		/* fully init console as a device */
+	console_init_r,				/* 控制台初始化，初始化完成以后此函数会调用stdio_print_current_devices函数来打印出当前的控制台设备 */
 #ifdef CONFIG_DISPLAY_BOARDINFO_LATE
 	show_board_info,
 #endif
@@ -910,9 +910,9 @@ init_fnc_t init_sequence_r[] = {
 #ifdef CONFIG_CMD_KGDB
 	initr_kgdb,
 #endif
-	interrupt_init,
+	interrupt_init,				/* 初始化中断 */
 #if defined(CONFIG_ARM) || defined(CONFIG_AVR32)
-	initr_enable_interrupts,
+	initr_enable_interrupts,	/* 使能中断 */
 #endif
 #if defined(CONFIG_MICROBLAZE) || defined(CONFIG_AVR32) || defined(CONFIG_M68K)
 	timer_init,		/* initialize timer */
@@ -922,10 +922,10 @@ init_fnc_t init_sequence_r[] = {
 #endif
 	/* PPC has a udelay(20) here dating from 2002. Why? */
 #ifdef CONFIG_CMD_NET
-	initr_ethaddr,
+	initr_ethaddr,				/* 初始化网络地址，也就是获取 MAC地址。读取环境变量ethaddr”的值 */
 #endif
 #ifdef CONFIG_BOARD_LATE_INIT
-	board_late_init,
+	board_late_init,			/* 板子后续初始化，此函数定义在板级c文件中 */
 #endif
 #ifdef CONFIG_FSL_FASTBOOT
 	initr_fastboot_setup,
@@ -985,7 +985,7 @@ init_fnc_t init_sequence_r[] = {
 #ifdef CONFIG_FSL_FASTBOOT
 	initr_check_fastboot,
 #endif
-	run_main_loop,
+	run_main_loop,		/* 主循环，处理命令 */
 };
 
 void board_init_r(gd_t *new_gd, ulong dest_addr)

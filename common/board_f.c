@@ -830,6 +830,7 @@ static init_fnc_t init_sequence_f[] = {
 #ifdef CONFIG_SANDBOX
 	setup_ram_buf,
 #endif
+	/* 函数设置 gd的 mon_len成员变量，即uboot代码的总长度 */
 	setup_mon_len,
 #ifdef CONFIG_OF_CONTROL
 	fdtdec_setup,
@@ -837,6 +838,10 @@ static init_fnc_t init_sequence_f[] = {
 #ifdef CONFIG_TRACE
 	trace_early_init,
 #endif
+	/* 
+	 * 函数初始化 gd中跟 malloc有关的成员变量，比如 malloc_limit，
+	 * 此函数会设置 gd->malloc_limit = CONFIG_SYS_MALLOC_F_LEN 
+	 */
 	initf_malloc,
 	initf_console_record,
 #if defined(CONFIG_MPC85xx) || defined(CONFIG_MPC86xx)
@@ -846,12 +851,12 @@ static init_fnc_t init_sequence_f[] = {
 #if defined(CONFIG_X86) && defined(CONFIG_HAVE_FSP)
 	x86_fsp_init,
 #endif
-	arch_cpu_init,		/* basic arch cpu dependent setup */
-	initf_dm,
+	arch_cpu_init,							/* 执行与特定 CPU 架构相关的初始化和配置工作 */
+	initf_dm,								/* 驱动模型的一些初始化 */
 	arch_cpu_init_dm,
-	mark_bootstage,		/* need timer, go after init dm */
+	mark_bootstage,							/* need timer, go after init dm */
 #if defined(CONFIG_BOARD_EARLY_INIT_F)
-	board_early_init_f,
+	board_early_init_f, 					/* 板子相关的早期的一些初始化设置，I.MX6ULL用来初始化串口的 IO配置*/
 #endif
 	/* TODO: can any of this go into arch_cpu_init()? */
 #if defined(CONFIG_PPC) && !defined(CONFIG_8xx_CPUCLK_DEFAULT)
@@ -866,7 +871,7 @@ static init_fnc_t init_sequence_f[] = {
 #if defined(CONFIG_ARM) || defined(CONFIG_MIPS) || \
 		defined(CONFIG_BLACKFIN) || defined(CONFIG_NDS32) || \
 		defined(CONFIG_SPARC)
-	timer_init,		/* initialize timer */
+	timer_init,		    					/* Cortex-A7内核有一个定时器，这里初始化的就是 Cortex-A内核的那个定时器。 */
 #endif
 #ifdef CONFIG_SYS_ALLOC_DPRAM
 #if !defined(CONFIG_CPM2)
@@ -874,12 +879,12 @@ static init_fnc_t init_sequence_f[] = {
 #endif
 #endif
 #if defined(CONFIG_BOARD_POSTCLK_INIT)
-	board_postclk_init,
+	board_postclk_init, 					/* 对于 I.MX6ULL来说是设置 VDDSOC电压 */
 #endif
 #if defined(CONFIG_SYS_FSL_CLK) || defined(CONFIG_M68K)
-	get_clocks,
+	get_clocks,         					/* 函数用于获取一些时钟值， I.MX6ULL获取的是 sdhc_clk时钟，也就是 SD卡外设的时钟 */
 #endif
-	env_init,		/* initialize environment */
+	env_init,		    					/* 函数是和环境变量有关的，设置 gd的成员变量 env_addr，也就是环境变量的保存地址。 */
 #if defined(CONFIG_8xx_CPUCLK_DEFAULT)
 	/* get CPU and bus clocks according to the environment variable */
 	get_clocks_866,
@@ -887,17 +892,17 @@ static init_fnc_t init_sequence_f[] = {
 	sdram_adjust_866,
 	init_timebase,
 #endif
-	init_baud_rate,		/* initialze baudrate settings */
-	serial_init,		/* serial communications setup */
-	console_init_f,		/* stage 1 init of console */
+	init_baud_rate,							/* 函数用于初始化波特率，根据环境变量 baudrate来初始化 gd->baudrate */
+	serial_init,							/* 初始化串口 */
+	console_init_f,							/* 设置 gd->have_console 为 1，表示有个控制台，此函数也将前面暂存在缓冲区中的数据通过控制台打印出来。*/
 #ifdef CONFIG_SANDBOX
 	sandbox_early_getopt_check,
 #endif
 #ifdef CONFIG_OF_CONTROL
 	fdtdec_prepare_fdt,
 #endif
-	display_options,	/* say that we are here */
-	display_text_info,	/* show debugging info if required */
+	display_options,						/* 通过串口输出一些信息 */
+	display_text_info,						/* 打印一些文本信息，如果开启 UBOOT的 DEBUG功能的话就会输出 text_base、 bss_start、 bss_end */
 #if defined(CONFIG_MPC8260)
 	prt_8260_rsr,
 	prt_8260_clks,
@@ -908,29 +913,29 @@ static init_fnc_t init_sequence_f[] = {
 #if defined(CONFIG_PPC) || defined(CONFIG_M68K)
 	checkcpu,
 #endif
-	print_cpuinfo,		/* display cpu info (and speed) */
+	print_cpuinfo,									/* 函数用于打印 CPU信息 (以及cpu速度 speed) */
 #if defined(CONFIG_MPC5xxx)
 	prt_mpc5xxx_clks,
 #endif /* CONFIG_MPC5xxx */
 #if defined(CONFIG_DISPLAY_BOARDINFO)
-	show_board_info,
+	show_board_info,    							/* 函数用于打印板子信息，会调用checkboard函数 */
 #endif
-	INIT_FUNC_WATCHDOG_INIT
+	INIT_FUNC_WATCHDOG_INIT 						/* 初始化看门狗 */
 #if defined(CONFIG_MISC_INIT_F)
 	misc_init_f,
 #endif
-	INIT_FUNC_WATCHDOG_RESET
+	INIT_FUNC_WATCHDOG_RESET						/* 复位看门狗 */
 #if defined(CONFIG_HARD_I2C) || defined(CONFIG_SYS_I2C)
-	init_func_i2c,
+	init_func_i2c,									/* 初始化 I2C */
 #endif
 #if defined(CONFIG_HARD_SPI)
-	init_func_spi,
+	init_func_spi,								    /* 初始化 SPI */
 #endif
-	announce_dram_init,
+	announce_dram_init,								/* 就是输出字符串"DRAM:" */
 	/* TODO: unify all these dram functions? */
 #if defined(CONFIG_ARM) || defined(CONFIG_X86) || defined(CONFIG_NDS32) || \
 		defined(CONFIG_MICROBLAZE) || defined(CONFIG_AVR32)
-	dram_init,		/* configure available RAM banks */
+	dram_init,										/* 并非真正的初始化 DDR，只是设置 gd->ram_size的值 */
 #endif
 #if defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_M68K)
 	init_func_ram,
@@ -938,7 +943,7 @@ static init_fnc_t init_sequence_f[] = {
 #ifdef CONFIG_POST
 	post_init_f,
 #endif
-	INIT_FUNC_WATCHDOG_RESET
+	INIT_FUNC_WATCHDOG_RESET						/* 复位看门狗 */
 #if defined(CONFIG_SYS_DRAM_TEST)
 	testdram,
 #endif /* CONFIG_SYS_DRAM_TEST */
@@ -949,18 +954,18 @@ static init_fnc_t init_sequence_f[] = {
 #endif
 	INIT_FUNC_WATCHDOG_RESET
 	/*
-	 * Now that we have DRAM mapped and working, we can
-	 * relocate the code and continue running from DRAM.
-	 *
-	 * Reserve memory at end of RAM for (top down in that order):
-	 *  - area that won't get touched by U-Boot and Linux (optional)
-	 *  - kernel log buffer
-	 *  - protected RAM
-	 *  - LCD framebuffer
-	 *  - monitor code
-	 *  - board info struct
-	 */
-	setup_dest_addr,
+	* 现在我们已经映射并使 DRAM 工作，我们可以
+	* 重定位代码并继续从 DRAM 运行。
+	*
+	* 在 RAM 结尾保留内存（自顶向下的顺序）：
+	*  - 不会被 U-Boot 和 Linux 使用的区域（可选）
+	*  - 内核日志缓冲区
+	*  - 受保护的 RAM
+	*  - LCD 帧缓冲区
+	*  - 监视器代码
+	*  - board info结构体
+	*/
+	setup_dest_addr,				/* 设置目的地址，设置 gd->ram_size gd->ram_top gd->relocaddr这三个的值 */
 #if defined(CONFIG_BLACKFIN)
 	/* Blackfin u-boot monitor should be on top of the ram */
 	reserve_uboot,
@@ -974,10 +979,10 @@ static init_fnc_t init_sequence_f[] = {
 #ifdef CONFIG_PRAM
 	reserve_pram,
 #endif
-	reserve_round_4k,
+	reserve_round_4k,				/* 函数用于对 gd->relocaddr做 4KB对齐 */
 #if !(defined(CONFIG_SYS_ICACHE_OFF) && defined(CONFIG_SYS_DCACHE_OFF)) && \
 		defined(CONFIG_ARM)
-	reserve_mmu,
+	reserve_mmu,					/* 留出 MMU的 TLB表的位置，分配 MMU的 TLB表内存以后会对 gd->relocaddr做 64K字节对齐 */
 #endif
 #ifdef CONFIG_DM_VIDEO
 	reserve_video,
@@ -994,19 +999,32 @@ static init_fnc_t init_sequence_f[] = {
 #endif /* CONFIG_DM_VIDEO */
 	reserve_trace,
 #if !defined(CONFIG_BLACKFIN)
-	reserve_uboot,
+	/*
+	* 留出重定位后的 uboot所占用的内存区域， uboot所占用大小由gd->mon_len所指定，
+	* 留出 uboot的空间以后还要对 gd->relocaddr做 4K字节对齐，并且重新设置 gd->start_addr_sp
+	*/
+	reserve_uboot,                 
 #endif
 #ifndef CONFIG_SPL_BUILD
-	reserve_malloc,
-	reserve_board,
+	reserve_malloc,			/* 留出 malloc区域，调整 gd->start_addr_sp位置， malloc区域由宏TOTAL_MALLOC_LEN定义 */
+	reserve_board, 			/* 留出板子 bd所占的内存区， bd是结 构体 bd_t bd_t大小为80字节，结果如图 */
 #endif
-	setup_machine,
-	reserve_global_data,
-	reserve_fdt,
+	setup_machine, 			/* 设置机器 ID 不用这种方式了，这是以前老版本的 uboot和linux使用的，新版本使用设备树了，因此此函数无效。*/
+	reserve_global_data, 	/* 保留出 gd_t的内存区域 */
+	reserve_fdt,   			/* 留出设备树相关的内存区域 */
 	reserve_arch,
+	/*
+	 * 留出栈空间，先对 gd->start_addr_sp减去 16，然后做 16字节对齐，
+	 * 如果使能IRQ的话还要留出 IRQ相应栈空间，具体工作是由 arch/arm/lib/stack.c文件中的
+     * 函数 arch_reserve_stacks完成
+	 */
 	reserve_stacks,
+	/*
+	 * 设置 dram信息，就是设置 gd->bd->bi_dram[0].start和gd->bd->bi_dram[0].size，
+	 * 后面会传递给 linux内核，告诉 linux DRAM的起始地址和大小
+	 */
 	setup_dram_config,
-	show_dram_config,
+	show_dram_config,  /*用于显示 DRAM的配置 */
 #if defined(CONFIG_PPC) || defined(CONFIG_M68K) || defined(CONFIG_MIPS)
 	setup_board_part1,
 #endif
@@ -1014,12 +1032,16 @@ static init_fnc_t init_sequence_f[] = {
 	INIT_FUNC_WATCHDOG_RESET
 	setup_board_part2,
 #endif
-	display_new_sp,
+	display_new_sp,   /*显示新的 sp位置*/
 #ifdef CONFIG_SYS_EXTBDINFO
 	setup_board_extra,
 #endif
 	INIT_FUNC_WATCHDOG_RESET
-	reloc_fdt,
+	reloc_fdt,        /* 函数用于重定位 fdt */
+	/* 
+	* 设置 gd的其他一些成员变量，供后面重定位的时候使用，并且将以前的 gd拷贝到 gd->new_gd处。
+	* 需要使能 DEBUG才能看到相应的信息输出
+	*/
 	setup_reloc,
 #if defined(CONFIG_X86) || defined(CONFIG_ARC)
 	copy_uboot_to_ram,
