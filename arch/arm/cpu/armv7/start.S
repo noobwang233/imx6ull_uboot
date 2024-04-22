@@ -28,7 +28,9 @@ save_boot_params_ret:
 	and	r1, r0, #0x1f		// 屏蔽掉模式位之外的其他位
 	teq	r1, #0x1a			// 测试是否处于 HYP（Hypervisor）模式
 	bicne	r0, r0, #0x1f	// 如果未处于 HYP 模式, 通过 bicne 指令清除程序状态寄存器中所有模式位
+	//cpsr的低五位为模式位，不同模式需写入不同的值，这里将其设置为svc模式
 	orrne	r0, r0, #0x13	// 通过 orrne 指令设置程序状态寄存器为 SVC（Supervisor）模式
+	//cpsr的第七位为irq中断使能位，第六位为fiq中断使能位，这里将irq和fiq中断禁用
 	orr	r0, r0, #0xc0		// 通过 orr 指令将程序状态寄存器的值设置为 0xc0，以禁用 FIQ 和 IRQ 中断
 	msr	cpsr,r0             // 将r0加载到cpsr, 生效配置
 

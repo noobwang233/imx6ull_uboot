@@ -196,9 +196,9 @@ int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype)
 {
 	struct fstype_info *info;
 	int part, i;
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
+#ifdef CONFIG_NEEDS_MANUAL_RELOC //需要手动重定位
 	static int relocated;
-
+	//将fstypes数组更新为重定向之后的值
 	if (!relocated) {
 		for (i = 0, info = fstypes; i < ARRAY_SIZE(fstypes);
 				i++, info++) {

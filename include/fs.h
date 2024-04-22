@@ -15,14 +15,11 @@
 #define FS_TYPE_UBIFS	4
 
 /*
- * Tell the fs layer which block device an partition to use for future
- * commands. This also internally identifies the filesystem that is present
- * within the partition. The identification process may be limited to a
- * specific filesystem type by passing FS_* in the fstype parameter.
+ * 告诉文件系统层将来命令要使用的块设备和分区。这还在内部标识了分区中存在的文件系统。
+ * 通过在 fstype 参数中传递 FS_*，可以将识别过程限制为特定的文件系统类型。
  *
- * Returns 0 on success.
- * Returns non-zero if there is an error accessing the disk or partition, or
- * no known filesystem type could be recognized on it.
+ * 成功时返回 0。
+ * 如果访问磁盘或分区时出现错误，或者无法识别任何已知的文件系统类型，则返回非零值。
  */
 int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype);
 
