@@ -39,13 +39,12 @@ struct uclass *uclass_find(enum uclass_id key)
 }
 
 /**
- * uclass_add() - Create new uclass in list
- * @id: Id number to create
- * @ucp: Returns pointer to uclass, or NULL on error
- * @return 0 on success, -ve on error
+ * uclass_add() - 在列表中创建新的 uclass
+ * @id: 要创建的 ID 编号
+ * @ucp: 返回指向 uclass 的指针，出错时返回 NULL
+ * @return 成功返回 0，出错返回负值
  *
- * The new uclass is added to the list. There must be only one uclass for
- * each id.
+ * 新的 uclass 被添加到列表中。每个 id 只能有一个 uclass。
  */
 static int uclass_add(enum uclass_id id, struct uclass **ucp)
 {

@@ -141,8 +141,8 @@ static int driver_check_compatible(const void *blob, int offset,
 int lists_bind_fdt(struct udevice *parent, const void *blob, int offset,
 		   struct udevice **devp)
 {
-	struct driver *driver = ll_entry_start(struct driver, driver);
-	const int n_ents = ll_entry_count(struct driver, driver);
+	struct driver *driver = ll_entry_start(struct driver, driver);//获得驱动列表的起始地址
+	const int n_ents = ll_entry_count(struct driver, driver);//获得驱动列表的总数量
 	const struct udevice_id *id;
 	struct driver *entry;
 	struct udevice *dev;
@@ -155,9 +155,9 @@ int lists_bind_fdt(struct udevice *parent, const void *blob, int offset,
 	if (devp)
 		*devp = NULL;
 	for (entry = driver; entry != driver + n_ents; entry++) {
-		ret = driver_check_compatible(blob, offset, entry->of_match,
+		ret = driver_check_compatible(blob, offset, entry->of_match,//检查设备节点的compatible属性
 					      &id);
-		name = fdt_get_name(blob, offset, NULL);
+		name = fdt_get_name(blob, offset, NULL);			//获取设备节点的name
 		if (ret == -ENOENT) {
 			continue;
 		} else if (ret == -ENODEV) {
@@ -170,7 +170,7 @@ int lists_bind_fdt(struct udevice *parent, const void *blob, int offset,
 		}
 
 		dm_dbg("   - found match at '%s'\n", entry->name);
-		ret = device_bind(parent, entry, name, NULL, offset, &dev);
+		ret = device_bind(parent, entry, name, NULL, offset, &dev);//调用device_bind来绑定设备
 		if (ret) {
 			dm_warn("Error binding driver '%s': %d\n", entry->name,
 				ret);

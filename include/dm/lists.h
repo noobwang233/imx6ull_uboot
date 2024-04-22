@@ -45,17 +45,15 @@ struct uclass_driver *lists_uclass_lookup(enum uclass_id id);
 int lists_bind_drivers(struct udevice *parent, bool pre_reloc_only);
 
 /**
- * lists_bind_fdt() - bind a device tree node
+ * lists_bind_fdt() - 绑定一个设备树节点
  *
- * This creates a new device bound to the given device tree node, with
- * @parent as its parent.
+ * 这将创建一个新的设备，将其绑定到给定的设备树节点，其父级为 @parent。
  *
- * @parent: parent device (root)
- * @blob: device tree blob
- * @offset: offset of this device tree node
- * @devp: if non-NULL, returns a pointer to the bound device
- * @return 0 if device was bound, -EINVAL if the device tree is invalid,
- * other -ve value on error
+ * @parent: 父设备（根）
+ * @blob: 设备树 blob
+ * @offset: 此设备树节点的偏移量
+ * @devp: 如果非空，则返回绑定的设备指针
+ * @return 如果设备被绑定返回 0，如果设备树无效返回 -EINVAL，其他负值表示出错
  */
 int lists_bind_fdt(struct udevice *parent, const void *blob, int offset,
 		   struct udevice **devp);

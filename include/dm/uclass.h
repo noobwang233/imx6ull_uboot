@@ -70,24 +70,30 @@ struct udevice;
  * @flags: 该 uclass 的标志（DM_UC_...）
  */
 struct uclass_driver {
-	const char *name;
-	enum uclass_id id;
-	int (*post_bind)(struct udevice *dev);
-	int (*pre_unbind)(struct udevice *dev);
-	int (*pre_probe)(struct udevice *dev);
-	int (*post_probe)(struct udevice *dev);
-	int (*pre_remove)(struct udevice *dev);
-	int (*child_post_bind)(struct udevice *dev);
-	int (*child_pre_probe)(struct udevice *dev);
-	int (*init)(struct uclass *class);
-	int (*destroy)(struct uclass *class);
-	int priv_auto_alloc_size;
-	int per_device_auto_alloc_size;
-	int per_device_platdata_auto_alloc_size;
-	int per_child_auto_alloc_size;
-	int per_child_platdata_auto_alloc_size;
-	const void *ops;
-	uint32_t flags;
+	const char *name;							// uclass 驱动程序的名称
+	enum uclass_id id;							// 该 uclass 的 ID 号码
+	int (*post_bind)(struct udevice *dev);		// 当一个新设备绑定到该 uclass 时调用
+	int (*pre_unbind)(struct udevice *dev);		// 当一个设备从该 uclass 解绑之前调用
+	int (*pre_probe)(struct udevice *dev);		// 在新设备被探测之前调用
+	int (*post_probe)(struct udevice *dev);		// 在新设备被探测之后调用
+	int (*pre_remove)(struct udevice *dev);		// 在一个设备被移除之前调用
+	int (*child_post_bind)(struct udevice *dev);	// 在该 uclass 中的设备的子级被绑定之后调用
+	int (*child_pre_probe)(struct udevice *dev);	// 在一个子设备被探测之前调用
+	int (*init)(struct uclass *class);			// 被调用以设置该 uclass
+	int (*destroy)(struct uclass *class);		// 被调用以销毁该 uclass
+	int priv_auto_alloc_size;					// 如果非零，则分配在 uclass 的 ->priv 指针中的私有数据的大小。
+												// 如果为零，则 uclass 驱动程序负责分配所需的任何数据。
+	int per_device_auto_alloc_size;				// 每个设备可以拥有 uclass 拥有的私有数据。
+												// 如果需要，如果此值为非零，则会自动分配。
+	int per_device_platdata_auto_alloc_size;	// 每个设备可以拥有 uclass 拥有的平台数据，
+												// 作为 'dev->uclass_platdata'。如果值为非零，则将自动分配。
+	int per_child_auto_alloc_size;				// 每个子设备（属于该 uclass 中的父设备）可以保存设备/uclass 的父数据。
+												// 如果驱动程序中的此成员为 0，则此值仅用作后备。
+	int per_child_platdata_auto_alloc_size;		// 总线喜欢存储有关其子级的信息。
+												// 如果非零，则此数据的大小，将分配在子设备的 parent_platdata 指针中。
+												// 如果驱动程序中的此成员为 0，则此值仅用作后备。
+	const void *ops;							// Uclass 操作，为 uclass 中的设备提供一致的接口。
+	uint32_t flags;								// 该 uclass 的标志（DM_UC_...）
 };
 
 /* Declare a new uclass_driver */

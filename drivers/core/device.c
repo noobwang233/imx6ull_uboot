@@ -59,8 +59,8 @@ int device_bind(struct udevice *parent, const struct driver *drv,
 	dev->name = name;
 	dev->of_offset = of_offset;
 	dev->parent = parent;
-	dev->driver = drv;
-	dev->uclass = uc;
+	dev->driver = drv;		   //绑定drier
+	dev->uclass = uc;          //绑定uclass
 
 	dev->seq = -1;
 	dev->req_seq = -1;
