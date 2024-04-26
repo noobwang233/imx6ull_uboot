@@ -212,22 +212,24 @@ int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype)
 		relocated = 1;
 	}
 #endif
-
+	// 从用户输入（eg: mmc 1:2）获取对应的块设备信息和分区信息，保存到全局变量fs_dev_desc和fs_partition
+	// 返回值part为分区数量
 	part = get_device_and_partition(ifname, dev_part_str, &fs_dev_desc,
 					&fs_partition, 1);
 	if (part < 0)
 		return -1;
-
+	// 遍历fstypes数组
 	for (i = 0, info = fstypes; i < ARRAY_SIZE(fstypes); i++, info++) {
+		// 如果传入的fstype不为FS_TYPE_ANY，则需要在fstypes数组中找到对应的文件系统类型
 		if (fstype != FS_TYPE_ANY && info->fstype != FS_TYPE_ANY &&
 				fstype != info->fstype)
 			continue;
-
+		//对应文件系统的的probe函数是否需要dev_desc不为NULL
 		if (!fs_dev_desc && !info->null_dev_desc_ok)
 			continue;
-
+		//调用文件系统的probe函数，根据fs_dev_desc和fs_partition判断是否是对应的文件系统
 		if (!info->probe(fs_dev_desc, &fs_partition)) {
-			fs_type = info->fstype;
+			fs_type = info->fstype;   //更新全局变量fs_type
 			return 0;
 		}
 	}
@@ -339,15 +341,19 @@ int do_size(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 {
 	loff_t size;
 
+	//参数个数检查
 	if (argc != 4)
 		return CMD_RET_USAGE;
-
+	// 根据用户输入的 interface 和 dev[:part]（eg: mmc 1:2）
+	// 1. 更新fs/fs.c下的全局变量fs_dev_desc和fs_partition，这两个变量分别表示当前选择的块设备信息和分区信息
+	// 2. 遍历fstypes数组，找到fstype对应的struct fstype_info元素
+	// 3. 调用对应文件系统的probe函数，判断fs_dev_desc和fs_partition对应的块设备和分区上是否是对应的文件系统
 	if (fs_set_blk_dev(argv[1], argv[2], fstype))
 		return 1;
-
+	// 调用对应文件系统的size函数，获取size
 	if (fs_size(argv[3], &size) < 0)
 		return CMD_RET_FAILURE;
-
+	// 结果写入环境量filesize
 	setenv_hex("filesize", size);
 
 	return 0;
@@ -356,59 +362,69 @@ int do_size(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		int fstype)
 {
-	unsigned long addr;
-	const char *addr_str;
-	const char *filename;
-	loff_t bytes;
-	loff_t pos;
+	unsigned long addr;		//加载到内存的地址
+	const char *addr_str;	//内存的地址字符串变量
+	const char *filename;	//被加载的文件绝对路径
+	loff_t bytes;			//加载的字节数
+	loff_t pos;				//读的文件相对于文件首地址的偏移
 	loff_t len_read;
 	int ret;
 	unsigned long time;
 	char *ep;
 
+	//参数个数检查
 	if (argc < 2)
 		return CMD_RET_USAGE;
 	if (argc > 7)
 		return CMD_RET_USAGE;
 
+	// 获取块设备信息和分区信息，保存到全局变量fs_dev_desc和fs_partition，并执行对应文件系统的probe函数
 	if (fs_set_blk_dev(argv[1], (argc >= 3) ? argv[2] : NULL, fstype))
 		return 1;
 
+	//参数数量大于等于4个，则第4个参数必须为加载到内存的地址addr
 	if (argc >= 4) {
+		//将第4个参数转换为ul类型
 		addr = simple_strtoul(argv[3], &ep, 16);
+		//没有发生转换或者转换结束后剩下的字符串第一个字符不为'\0',则输入参数有误
 		if (ep == argv[3] || *ep != '\0')
 			return CMD_RET_USAGE;
 	} else {
+		//参数数量小于4个，则从环境变量loadaddr里获取loadaddr
 		addr_str = getenv("loadaddr");
 		if (addr_str != NULL)
 			addr = simple_strtoul(addr_str, NULL, 16);
 		else
 			addr = CONFIG_SYS_LOAD_ADDR;
 	}
+	//参数数量大于等于5个, 第5个参数必须为文件的绝对路径名称filename
 	if (argc >= 5) {
 		filename = argv[4];
 	} else {
+		//否则从环境变量bootfile获取filename
 		filename = getenv("bootfile");
 		if (!filename) {
 			puts("** No boot file defined **\n");
 			return 1;
 		}
 	}
-	if (argc >= 6)
+	if (argc >= 6)//参数数量大于等于6个, 第6个参数必须为加载字节数量bytes
 		bytes = simple_strtoul(argv[5], NULL, 16);
 	else
-		bytes = 0;
-	if (argc >= 7)
+		bytes = 0;//bytes默认值为0，表示读取整个文件
+	if (argc >= 7)//参数数量大于等于7个, 第7个参数必须为相对于文件首地址的偏移pos
 		pos = simple_strtoul(argv[6], NULL, 16);
 	else
-		pos = 0;
+		pos = 0;//pos默认值为0，表示从文件首地址开始读取
 
-	time = get_timer(0);
+	time = get_timer(0);//获取此时的时间
+	//调用fs_read，稍后讲解
 	ret = fs_read(filename, addr, pos, bytes, &len_read);
-	time = get_timer(time);
+	time = get_timer(time);//计算read所消耗的时间
 	if (ret < 0)
 		return 1;
 
+	//显示命令执行信息
 	printf("%llu bytes read in %lu ms", len_read, time);
 	if (time > 0) {
 		puts(" (");
@@ -417,6 +433,7 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	}
 	puts("\n");
 
+	//保存加载目的地址addr和读取到的长度len_read到环境变量fileaddr和filesize
 	setenv_hex("fileaddr", addr);
 	setenv_hex("filesize", len_read);
 
@@ -433,7 +450,7 @@ int do_ls(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 
 	if (fs_set_blk_dev(argv[1], (argc >= 3) ? argv[2] : NULL, fstype))
 		return 1;
-
+	//不给出目录的话，默认为/
 	if (fs_ls(argc >= 4 ? argv[3] : "/"))
 		return 1;
 
@@ -522,15 +539,15 @@ int do_fs_type(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	if (argc < 3 || argc > 4)
 		return CMD_RET_USAGE;
-
+	// 获取块设备信息和分区信息，保存到全局变量fs_dev_desc和fs_partition，并执行对应文件系统的probe函数
 	if (fs_set_blk_dev(argv[1], argv[2], FS_TYPE_ANY))
 		return 1;
-
+	//从fstypes查找fs_type对应的元素
 	info = fs_get_info(fs_type);
 
-	if (argc == 4)
+	if (argc == 4)//参数4个的话，就把结果保存到argv[3]环境变量
 		setenv(argv[3], info->name);
-	else
+	else		  //否则就显示结果
 		printf("%s\n", info->name);
 
 	return CMD_RET_SUCCESS;

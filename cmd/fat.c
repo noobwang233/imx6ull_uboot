@@ -76,17 +76,22 @@ static int do_fat_fsinfo(cmd_tbl_t *cmdtp, int flag, int argc,
 		printf("usage: fatinfo <interface> [<dev[:part]>]\n");
 		return 0;
 	}
-
+	// 从用户输入（eg: argv[1] = "mmc", argv[2] = "1:2"）获取对应的块设备信息和分区信息，保存到dev_desc和info
+	// 返回值part为分区数量
 	part = get_device_and_partition(argv[1], argv[2], &dev_desc, &info, 1);
 	if (part < 0)
-		return 1;
+		return 1; //获取失败
 
-	dev = dev_desc->dev;
+	dev = dev_desc->dev;//设备序号
+	// 检查dev_desc设备的info分区是否为fat文件系统，如果是的话，更新fs/fat.c下的两个全局变量
+	// static block_dev_desc_t *cur_dev;
+	// static disk_partition_t cur_part_info;
 	if (fat_set_blk_dev(dev_desc, &info) != 0) {
 		printf("\n** Unable to use %s %d:%d for fatinfo **\n",
 			argv[1], dev, part);
 		return 1;
 	}
+	// 打印fs/fat.c下全局变量cur_dev和cur_part_info指向的设备和分区信息
 	return file_fat_detectfs();
 }
 
