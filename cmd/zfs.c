@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  *
  * ZFS filesystem porting to Uboot by
@@ -5,14 +6,13 @@
  *
  * zfsfs support
  * made from existing GRUB Sources by Sun, GNU and others.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <part.h>
 #include <config.h>
 #include <command.h>
+#include <env.h>
 #include <image.h>
 #include <linux/ctype.h>
 #include <asm/byteorder.h>
@@ -24,7 +24,7 @@
 #include <usb.h>
 #endif
 
-#if !defined(CONFIG_DOS_PARTITION) && !defined(CONFIG_EFI_PARTITION)
+#if !CONFIG_IS_ENABLED(DOS_PARTITION) && !CONFIG_IS_ENABLED(EFI_PARTITION)
 #error DOS or EFI partition support must be selected
 #endif
 
@@ -39,8 +39,7 @@ static int do_zfs_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	int part;
 	ulong addr = 0;
 	disk_partition_t info;
-	block_dev_desc_t *dev_desc;
-	char buf[12];
+	struct blk_desc *dev_desc;
 	unsigned long count;
 	const char *addr_str;
 	struct zfs_file zfile;
@@ -51,10 +50,10 @@ static int do_zfs_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 
 	count = 0;
 	addr = simple_strtoul(argv[3], NULL, 16);
-	filename = getenv("bootfile");
+	filename = env_get("bootfile");
 	switch (argc) {
 	case 3:
-		addr_str = getenv("loadaddr");
+		addr_str = env_get("loadaddr");
 		if (addr_str != NULL)
 			addr = simple_strtoul(addr_str, NULL, 16);
 		else
@@ -80,11 +79,11 @@ static int do_zfs_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 		return 1;
 	}
 
-	part = get_device_and_partition(argv[1], argv[2], &dev_desc, &info, 1);
+	part = blk_get_device_part_str(argv[1], argv[2], &dev_desc, &info, 1);
 	if (part < 0)
 		return 1;
 
-	dev = dev_desc->dev;
+	dev = dev_desc->devnum;
 	printf("Loading file \"%s\" from %s device %d%c%c\n",
 		filename, argv[1], dev,
 		part ? ':' : ' ', part ? part + '0' : ' ');
@@ -112,10 +111,10 @@ static int do_zfs_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	zfs_close(&zfile);
 
 	/* Loading ok, update default load address */
-	load_addr = addr;
+	image_load_addr = addr;
 
 	printf("%llu bytes read\n", zfile.size);
-	setenv_hex("filesize", zfile.size);
+	env_set_hex("filesize", zfile.size);
 
 	return 0;
 }
@@ -135,7 +134,7 @@ static int do_zfs_ls(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	const char *filename = "/";
 	int part;
-	block_dev_desc_t *dev_desc;
+	struct blk_desc *dev_desc;
 	disk_partition_t info;
 	struct device_s vdev;
 
@@ -145,7 +144,7 @@ static int do_zfs_ls(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if (argc == 4)
 		filename = argv[3];
 
-	part = get_device_and_partition(argv[1], argv[2], &dev_desc, &info, 1);
+	part = blk_get_device_part_str(argv[1], argv[2], &dev_desc, &info, 1);
 	if (part < 0)
 		return 1;
 

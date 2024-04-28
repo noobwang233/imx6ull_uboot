@@ -1,15 +1,15 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (c) 2013 Google, Inc
  *
  * (C) Copyright 2012
  * Pavel Herrmann <morpheus.ibis@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _DM_LISTS_H_
 #define _DM_LISTS_H_
 
+#include <dm/ofnode.h>
 #include <dm/uclass-id.h>
 
 /**
@@ -39,24 +39,27 @@ struct uclass_driver *lists_uclass_lookup(enum uclass_id id);
  * each one. The devices will have @parent as their parent.
  *
  * @parent: parent device (root)
- * @early_only: If true, bind only drivers with the DM_INIT_F flag. If false
- * bind all drivers.
+ * @pre_reloc_only: If true, bind only drivers with the DM_FLAG_PRE_RELOC flag.
+ * If false bind all drivers.
  */
 int lists_bind_drivers(struct udevice *parent, bool pre_reloc_only);
 
 /**
- * lists_bind_fdt() - 绑定一个设备树节点
+ * lists_bind_fdt() - bind a device tree node
  *
- * 这将创建一个新的设备，将其绑定到给定的设备树节点，其父级为 @parent。
+ * This creates a new device bound to the given device tree node, with
+ * @parent as its parent.
  *
- * @parent: 父设备（根）
- * @blob: 设备树 blob
- * @offset: 此设备树节点的偏移量
- * @devp: 如果非空，则返回绑定的设备指针
- * @return 如果设备被绑定返回 0，如果设备树无效返回 -EINVAL，其他负值表示出错
+ * @parent: parent device (root)
+ * @node: device tree node to bind
+ * @devp: if non-NULL, returns a pointer to the bound device
+ * @pre_reloc_only: If true, bind only nodes with special devicetree properties,
+ * or drivers with the DM_FLAG_PRE_RELOC flag. If false bind all drivers.
+ * @return 0 if device was bound, -EINVAL if the device tree is invalid,
+ * other -ve value on error
  */
-int lists_bind_fdt(struct udevice *parent, const void *blob, int offset,
-		   struct udevice **devp);
+int lists_bind_fdt(struct udevice *parent, ofnode node, struct udevice **devp,
+		   bool pre_reloc_only);
 
 /**
  * device_bind_driver() - bind a device to a driver
@@ -84,7 +87,7 @@ int device_bind_driver(struct udevice *parent, const char *drv_name,
  * @devp:	If non-NULL, returns the newly bound device
  */
 int device_bind_driver_to_node(struct udevice *parent, const char *drv_name,
-			       const char *dev_name, int node,
+			       const char *dev_name, ofnode node,
 			       struct udevice **devp);
 
 #endif

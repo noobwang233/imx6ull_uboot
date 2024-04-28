@@ -1,15 +1,12 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2015 Freescale Semiconductor, Inc. All Rights Reserved.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_ARCH_MX7_IMX_REGS_H__
 #define __ASM_ARCH_MX7_IMX_REGS_H__
 
 #define ARCH_MXC
-
-#define CONFIG_SYS_CACHELINE_SIZE	64
 
 #define ROM_SW_INFO_ADDR                0x000001E8
 #define ROMCP_ARB_BASE_ADDR             0x00000000
@@ -21,7 +18,7 @@
 #define GIC400_ARB_END_ADDR             0x31007FFF
 #define APBH_DMA_ARB_BASE_ADDR          0x33000000
 #define APBH_DMA_ARB_END_ADDR           0x33007FFF
-#define M4_BOOTROM_BASE_ADDR            0x00180000
+#define MCU_BOOTROM_BASE_ADDR            0x00180000
 
 #define MXS_APBH_BASE			APBH_DMA_ARB_BASE_ADDR
 #define MXS_GPMI_BASE			(APBH_DMA_ARB_BASE_ADDR + 0x02000)
@@ -146,7 +143,7 @@
 #define ELCDIF1_IPS_BASE_ADDR           (AIPS2_OFF_BASE_ADDR+0x130000)
 #define MIPI_CSI2_IPS_BASE_ADDR         (AIPS2_OFF_BASE_ADDR+0x150000)
 #define MIPI_DSI_IPS_BASE_ADDR          (AIPS2_OFF_BASE_ADDR+0x160000)
-#define IP2APB_TZASC1_IPS_BASE_ADDR     (AIPS2_OFF_BASE_ADDR+0x180000)
+#define IP2APB_TZASC1_BASE_ADDR     	(AIPS2_OFF_BASE_ADDR+0x180000)
 #define DDRPHY_IPS_BASE_ADDR            (AIPS2_OFF_BASE_ADDR+0x190000)
 #define DDRC_IPS_BASE_ADDR              (AIPS2_OFF_BASE_ADDR+0x1A0000)
 #define IP2APB_PERFMON1_IPS_BASE_ADDR   (AIPS2_OFF_BASE_ADDR+0x1C0000)
@@ -215,15 +212,22 @@
 #define SEMAPHORE1_BASE_ADDR SEMA41_IPS_BASE_ADDR
 #define SEMAPHORE2_BASE_ADDR SEMA42_IPS_BASE_ADDR
 #define RDC_BASE_ADDR RDC_IPS_BASE_ADDR
+#define REGS_QOS_BASE     QOSC_IPS_BASE_ADDR
+#define REGS_QOS_EPDC     (QOSC_IPS_BASE_ADDR + 0x3400)
+#define REGS_QOS_PXP0     (QOSC_IPS_BASE_ADDR + 0x2C00)
+#define REGS_QOS_PXP1     (QOSC_IPS_BASE_ADDR + 0x3C00)
 
 #define FEC_QUIRK_ENET_MAC
 #define SNVS_LPGPR	0x68
-
-#define CONFIG_SYS_FSL_SEC_ADDR         (CAAM_IPS_BASE_ADDR)
-#define CONFIG_SYS_FSL_JR0_ADDR         (CONFIG_SYS_FSL_SEC_ADDR  + 0x1000)
-
+#define CONFIG_SYS_FSL_SEC_OFFSET       0
+#define CONFIG_SYS_FSL_SEC_ADDR         (CAAM_IPS_BASE_ADDR + \
+					 CONFIG_SYS_FSL_SEC_OFFSET)
+#define CONFIG_SYS_FSL_JR0_OFFSET       0x1000
+#define CONFIG_SYS_FSL_JR0_ADDR         (CONFIG_SYS_FSL_SEC_ADDR + \
+					 CONFIG_SYS_FSL_JR0_OFFSET)
+#define CONFIG_SYS_FSL_MAX_NUM_OF_SEC   1
 #if !(defined(__KERNEL_STRICT_NAMES) || defined(__ASSEMBLY__))
-#include <asm/imx-common/regs-lcdif.h>
+#include <asm/mach-imx/regs-lcdif.h>
 #include <asm/types.h>
 
 extern void imx_get_mac_from_fuse(int dev_id, unsigned char *mac);
@@ -263,10 +267,16 @@ struct src {
 	u32 ddrc_rcr;
 };
 
-#define SRC_M4RCR_M4C_NON_SCLR_RST_OFFSET	0
-#define SRC_M4RCR_M4C_NON_SCLR_RST_MASK		(1 << 0)
-#define SRC_M4RCR_ENABLE_M4_OFFSET		3
-#define SRC_M4RCR_ENABLE_M4_MASK		(1 << 3)
+#define src_base ((struct src *)SRC_BASE_ADDR)
+
+#define SRC_M4_REG_OFFSET		0xC
+#define SRC_M4C_NON_SCLR_RST_OFFSET	0
+#define SRC_M4C_NON_SCLR_RST_MASK	BIT(0)
+#define SRC_M4_ENABLE_OFFSET		3
+#define SRC_M4_ENABLE_MASK		BIT(3)
+
+#define SRC_DDRC_RCR_DDRC_CORE_RST_OFFSET	1
+#define SRC_DDRC_RCR_DDRC_CORE_RST_MASK		(1 << 1)
 
 /* GPR0 Bit Fields */
 #define IOMUXC_GPR_GPR0_DMAREQ_MUX_SEL0_MASK     0x1u
@@ -826,6 +836,7 @@ struct src {
 #define IMX7D_GPR5_CSI1_MUX_CTRL_MIPI_CSI		(0x1 << 4)
 
 struct iomuxc {
+	u32 reserved[0x4000];
 	u32 gpr[23];
 	/* mux and pad registers */
 };
@@ -1198,20 +1209,16 @@ extern void check_cpu_temperature(void);
 extern void pcie_power_up(void);
 extern void pcie_power_off(void);
 
+#include <stdbool.h>
+bool is_usb_boot(void);
+#define is_boot_from_usb  is_usb_boot
+
 /* If ROM fail back to USB recover mode, USBPH0_PWD will be clear to use USB
  * If boot from the other mode, USB0_PWD will keep reset value
  */
-#define	is_boot_from_usb(void) (readl(USBOTG1_IPS_BASE_ADDR + 0x158) || \
+#define	is_usbotg_boot_enabled(void) (readl(USBOTG1_IPS_BASE_ADDR + 0x158) || \
 	readl(USBOTG2_IPS_BASE_ADDR + 0x158))
 #define	disconnect_from_pc(void) writel(0x0, USBOTG1_IPS_BASE_ADDR + 0x140)
-
-/* Boot device type */
-#define BOOT_TYPE_SD		0x1
-#define BOOT_TYPE_MMC		0x2
-#define BOOT_TYPE_NAND		0x3
-#define BOOT_TYPE_QSPI		0x4
-#define BOOT_TYPE_WEIM		0x5
-#define BOOT_TYPE_SPINOR	0x6
 
 struct bootrom_sw_info {
 	u8 reserved_1;

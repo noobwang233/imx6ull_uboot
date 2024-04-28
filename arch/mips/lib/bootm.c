@@ -1,14 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <env.h>
 #include <image.h>
 #include <fdt_support.h>
 #include <asm/addrspace.h>
+#include <asm/io.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -41,7 +42,7 @@ void arch_lmb_reserve(struct lmb *lmb)
 
 	/* adjust sp by 4K to be safe */
 	sp -= 4096;
-	lmb_reserve(lmb, sp, CONFIG_SYS_SDRAM_BASE + gd->ram_size - sp);
+	lmb_reserve(lmb, sp, gd->ram_top - sp);
 }
 
 static void linux_cmdline_init(void)
@@ -79,7 +80,7 @@ static void linux_cmdline_legacy(bootm_headers_t *images)
 
 	linux_cmdline_init();
 
-	bootargs = getenv("bootargs");
+	bootargs = env_get("bootargs");
 	if (!bootargs)
 		return;
 
@@ -201,11 +202,11 @@ static void linux_env_legacy(bootm_headers_t *images)
 	sprintf(env_buf, "0x%X", (uint) (gd->bd->bi_flashsize));
 	linux_env_set("flash_size", env_buf);
 
-	cp = getenv("ethaddr");
+	cp = env_get("ethaddr");
 	if (cp)
 		linux_env_set("ethaddr", cp);
 
-	cp = getenv("eth1addr");
+	cp = env_get("eth1addr");
 	if (cp)
 		linux_env_set("eth1addr", cp);
 
@@ -213,23 +214,6 @@ static void linux_env_legacy(bootm_headers_t *images)
 		sprintf(env_buf, "%un8r", gd->baudrate);
 		linux_env_set("modetty0", env_buf);
 	}
-}
-
-static int boot_reloc_ramdisk(bootm_headers_t *images)
-{
-	ulong rd_len = images->rd_end - images->rd_start;
-
-	/*
-	 * In case of legacy uImage's, relocation of ramdisk is already done
-	 * by do_bootm_states() and should not repeated in 'bootm prep'.
-	 */
-	if (images->state & BOOTM_STATE_RAMDISK) {
-		debug("## Ramdisk already relocated\n");
-		return 0;
-	}
-
-	return boot_ramdisk_high(&images->lmb, images->rd_start,
-		rd_len, &images->initrd_start, &images->initrd_end);
 }
 
 static int boot_reloc_fdt(bootm_headers_t *images)
@@ -252,43 +236,41 @@ static int boot_reloc_fdt(bootm_headers_t *images)
 #endif
 }
 
-int arch_fixup_memory_node(void *blob)
-{
 #if CONFIG_IS_ENABLED(MIPS_BOOT_FDT) && CONFIG_IS_ENABLED(OF_LIBFDT)
-	u64 mem_start = 0;
+int arch_fixup_fdt(void *blob)
+{
+	u64 mem_start = virt_to_phys((void *)gd->bd->bi_memstart);
 	u64 mem_size = gd->ram_size;
 
 	return fdt_fixup_memory_banks(blob, &mem_start, &mem_size, 1);
-#else
-	return 0;
-#endif
 }
+#endif
 
 static int boot_setup_fdt(bootm_headers_t *images)
 {
+	images->initrd_start = virt_to_phys((void *)images->initrd_start);
+	images->initrd_end = virt_to_phys((void *)images->initrd_end);
 	return image_setup_libfdt(images, images->ft_addr, images->ft_len,
 		&images->lmb);
 }
 
 static void boot_prep_linux(bootm_headers_t *images)
 {
-	boot_reloc_ramdisk(images);
-
 	if (CONFIG_IS_ENABLED(MIPS_BOOT_FDT) && images->ft_len) {
 		boot_reloc_fdt(images);
 		boot_setup_fdt(images);
 	} else {
-		if (CONFIG_IS_ENABLED(CONFIG_MIPS_BOOT_ENV_LEGACY))
-			linux_env_legacy(images);
-
 		if (CONFIG_IS_ENABLED(MIPS_BOOT_CMDLINE_LEGACY)) {
 			linux_cmdline_legacy(images);
 
-			if (!CONFIG_IS_ENABLED(CONFIG_MIPS_BOOT_ENV_LEGACY))
+			if (!CONFIG_IS_ENABLED(MIPS_BOOT_ENV_LEGACY))
 				linux_cmdline_append(images);
 
 			linux_cmdline_dump();
 		}
+
+		if (CONFIG_IS_ENABLED(MIPS_BOOT_ENV_LEGACY))
+			linux_env_legacy(images);
 	}
 }
 

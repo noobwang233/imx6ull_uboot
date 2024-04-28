@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /**
  * gadget.c - DesignWare USB3 DRD Controller Gadget Framework Link
  *
@@ -10,20 +11,19 @@
  * to uboot.
  *
  * commit 8e74475b0e : usb: dwc3: gadget: use udc-core's reset notifier
- *
- * SPDX-License-Identifier:     GPL-2.0
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <malloc.h>
-#include <asm/dma-mapping.h>
-#include <usb/lin_gadget_compat.h>
+#include <dm/device_compat.h>
+#include <dm/devres.h>
 #include <linux/bug.h>
+#include <linux/dma-mapping.h>
 #include <linux/list.h>
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
-#include <asm/arch/sys_proto.h>
 
 #include "core.h"
 #include "gadget.h"
@@ -245,7 +245,8 @@ void dwc3_gadget_giveback(struct dwc3_ep *dep, struct dwc3_request *req,
 
 	list_del(&req->list);
 	req->trb = NULL;
-	dwc3_flush_cache((long)req->request.dma, req->request.length);
+	if (req->request.length)
+		dwc3_flush_cache((uintptr_t)req->request.dma, req->request.length);
 
 	if (req->request.status == -EINPROGRESS)
 		req->request.status = status;
@@ -772,8 +773,8 @@ static void dwc3_prepare_one_trb(struct dwc3_ep *dep,
 
 	trb->ctrl |= DWC3_TRB_CTRL_HWO;
 
-	dwc3_flush_cache((long)dma, length);
-	dwc3_flush_cache((long)trb, sizeof(*trb));
+	dwc3_flush_cache((uintptr_t)dma, length);
+	dwc3_flush_cache((uintptr_t)trb, sizeof(*trb));
 }
 
 /*
@@ -969,8 +970,8 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 	 * so HACK the request length
 	 */
 	if (dep->direction == 0 &&
-	    req->request.length < dep->endpoint.maxpacket)
-		req->request.length = dep->endpoint.maxpacket;
+	    req->request.length < usb_endpoint_maxp(dep->endpoint.desc))
+		req->request.length = usb_endpoint_maxp(dep->endpoint.desc);
 
 	/*
 	 * We only add to our list of requests now and
@@ -1482,7 +1483,7 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 	if (dwc->revision < DWC3_REVISION_220A) {
 		reg |= DWC3_DCFG_SUPERSPEED;
 	} else {
-		switch (dwc->maximum_speed) {
+		switch (dwc->gadget.max_speed) {
 		case USB_SPEED_LOW:
 			reg |= DWC3_DSTS_LOWSPEED;
 			break;
@@ -1606,7 +1607,12 @@ static int dwc3_gadget_init_hw_endpoints(struct dwc3 *dwc,
 		} else {
 			int		ret;
 
-			usb_ep_set_maxpacket_limit(&dep->endpoint, 512);
+			if (dwc->maximum_speed >= USB_SPEED_SUPER)
+				usb_ep_set_maxpacket_limit(&dep->endpoint,
+							   1024);
+			else
+				usb_ep_set_maxpacket_limit(&dep->endpoint,
+							   512);
 			dep->endpoint.max_streams = 15;
 			dep->endpoint.ops = &dwc3_gadget_ep_ops;
 			list_add_tail(&dep->endpoint.ep_list,
@@ -1770,7 +1776,7 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 	slot %= DWC3_TRB_NUM;
 	trb = &dep->trb_pool[slot];
 
-	dwc3_flush_cache((long)trb, sizeof(*trb));
+	dwc3_flush_cache((uintptr_t)trb, sizeof(*trb));
 	__dwc3_cleanup_done_trbs(dwc, dep, req, trb, event, status);
 	dwc3_gadget_giveback(dep, req, status);
 
@@ -2559,6 +2565,7 @@ static irqreturn_t dwc3_interrupt(int irq, void *_dwc)
 int dwc3_gadget_init(struct dwc3 *dwc)
 {
 	int					ret;
+	u32 reg;
 
 	dwc->ctrl_req = dma_alloc_coherent(sizeof(*dwc->ctrl_req),
 					(unsigned long *)&dwc->ctrl_req_addr);
@@ -2592,7 +2599,7 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 	}
 
 	dwc->gadget.ops			= &dwc3_gadget_ops;
-	dwc->gadget.max_speed		= USB_SPEED_SUPER;
+	dwc->gadget.max_speed		= dwc->maximum_speed;
 	dwc->gadget.speed		= USB_SPEED_UNKNOWN;
 	dwc->gadget.name		= "dwc3-gadget";
 
@@ -2611,11 +2618,15 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 	if (ret)
 		goto err4;
 
-	ret = usb_add_gadget_udc(dwc->dev, &dwc->gadget);
+	ret = usb_add_gadget_udc((struct device *)dwc->dev, &dwc->gadget);
 	if (ret) {
 		dev_err(dwc->dev, "failed to register udc\n");
 		goto err4;
 	}
+
+	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
+	reg &= ~(DWC3_DCTL_INITU1ENA | DWC3_DCTL_INITU2ENA);
+	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
 
 	return 0;
 
@@ -2669,11 +2680,12 @@ void dwc3_gadget_uboot_handle_interrupt(struct dwc3 *dwc)
 		int i;
 		struct dwc3_event_buffer *evt;
 
+		dwc3_thread_interrupt(0, dwc);
+
+		/* Clean + Invalidate the buffers after touching them */
 		for (i = 0; i < dwc->num_event_buffers; i++) {
 			evt = dwc->ev_buffs[i];
-			dwc3_flush_cache((long)evt->buf, evt->length);
+			dwc3_flush_cache((uintptr_t)evt->buf, evt->length);
 		}
-
-		dwc3_thread_interrupt(0, dwc);
 	}
 }

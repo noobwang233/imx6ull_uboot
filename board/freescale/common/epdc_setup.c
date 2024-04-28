@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2016 Freescale Semiconductor, Inc. All Rights Reserved.
  *
  * Peng Fan <Peng.Fan@freescale.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <lcd.h>
@@ -11,6 +10,8 @@
 #include <linux/types.h>
 #include <malloc.h>
 #include <mxc_epdc_fb.h>
+#include <fs.h>
+#include <cpu_func.h>
 
 #define is_digit(c)	((c) >= '0' && (c) <= '9')
 __weak int mmc_get_env_devno(void)
@@ -29,17 +30,17 @@ int board_setup_waveform_file(ulong waveform_buf)
 	ulong file_len, mmc_dev;
 
 	if (!check_mmc_autodetect())
-		mmc_dev = getenv_ulong("mmcdev", 10, 0);
+		mmc_dev = env_get_ulong("mmcdev", 10, 0);
 	else
 		mmc_dev = mmc_get_env_devno();
 
-	sprintf(addr, "%lx", waveform_buf);
+	sprintf(addr, "%lx", (ulong)CONFIG_SYS_LOAD_ADDR);
 
 	fs_argv[0] = "fatload";
 	fs_argv[1] = "mmc";
 	fs_argv[2] = simple_itoa(mmc_dev);
 	fs_argv[3] = addr;
-	fs_argv[4] = getenv("epdc_waveform");
+	fs_argv[4] = env_get("epdc_waveform");
 
 	if (!fs_argv[4])
 		fs_argv[4] = "epdc_splash.bin";
@@ -49,11 +50,13 @@ int board_setup_waveform_file(ulong waveform_buf)
 		return -1;
 	}
 
-	file_len = getenv_hex("filesize", 0);
+	file_len = env_get_hex("filesize", 0);
 	if (!file_len)
 		return -1;
 
-	flush_cache(waveform_buf, file_len);
+	memcpy((void *)waveform_buf, (const void *)CONFIG_SYS_LOAD_ADDR, file_len);
+
+	flush_cache(waveform_buf, roundup(file_len, ARCH_DMA_MINALIGN));
 
 	return 0;
 }
@@ -77,7 +80,7 @@ int board_setup_logo_file(void *display_buf)
 	max_check_length = 128;
 
 	if (!check_mmc_autodetect())
-		mmc_dev = getenv_ulong("mmcdev", 10, 0);
+		mmc_dev = env_get_ulong("mmcdev", 10, 0);
 	else
 		mmc_dev = mmc_get_env_devno();
 
@@ -86,7 +89,7 @@ int board_setup_logo_file(void *display_buf)
 	fs_argv[0] = "fatsize";
 	fs_argv[1] = "mmc";
 	fs_argv[2] = simple_itoa(mmc_dev);
-	fs_argv[3] = getenv("epdc_logo");
+	fs_argv[3] = env_get("epdc_logo");
 	if (!fs_argv[3])
 		fs_argv[3] = "epdc_logo.pgm";
 	if (do_fat_size(NULL, 0, 4, fs_argv)) {
@@ -105,7 +108,7 @@ int board_setup_logo_file(void *display_buf)
 		return 0;
 	}
 
-	file_len = getenv_hex("filesize", 0);
+	file_len = env_get_hex("filesize", 0);
 	if (!file_len)
 		return -EINVAL;
 
@@ -113,13 +116,13 @@ int board_setup_logo_file(void *display_buf)
 	if (!buf)
 		return -ENOMEM;
 
-	sprintf(addr, "%lx", (ulong)buf);
+	sprintf(addr, "%lx", (ulong)CONFIG_SYS_LOAD_ADDR);
 
 	fs_argv[0] = "fatload";
 	fs_argv[1] = "mmc";
 	fs_argv[2] = simple_itoa(mmc_dev);
 	fs_argv[3] = addr;
-	fs_argv[4] = getenv("epdc_logo");
+	fs_argv[4] = env_get("epdc_logo");
 
 	if (!fs_argv[4])
 		fs_argv[4] = "epdc_logo.pgm";
@@ -129,6 +132,8 @@ int board_setup_logo_file(void *display_buf)
 		free(buf);
 		return -1;
 	}
+
+	memcpy((void *)buf, (const void *)CONFIG_SYS_LOAD_ADDR, file_len);
 
 	if (strncmp(buf, "P5", 2)) {
 		printf("Wrong format for epdc logo, use PGM-P5 format.\n");
@@ -180,7 +185,7 @@ int board_setup_logo_file(void *display_buf)
 	/* m,m means center of screen */
 	row = 0;
 	col = 0;
-	s = getenv("splashpos");
+	s = env_get("splashpos");
 	if (s) {
 		if (s[0] == 'm')
 			col = (panel_info.vl_col  - logo_width) >> 1;

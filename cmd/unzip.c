@@ -1,12 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <command.h>
+#include <env.h>
+#include <gzip.h>
 
 static int do_unzip(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
@@ -28,8 +29,8 @@ static int do_unzip(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if (gunzip((void *) dst, dst_len, (void *) src, &src_len) != 0)
 		return 1;
 
-	printf("Uncompressed size: %ld = 0x%lX\n", src_len, src_len);
-	setenv_hex("filesize", src_len);
+	printf("Uncompressed size: %lu = 0x%lX\n", src_len, src_len);
+	env_set_hex("filesize", src_len);
 
 	return 0;
 }
@@ -43,7 +44,7 @@ U_BOOT_CMD(
 static int do_gzwrite(cmd_tbl_t *cmdtp, int flag,
 		      int argc, char * const argv[])
 {
-	block_dev_desc_t *bdev;
+	struct blk_desc *bdev;
 	int ret;
 	unsigned char *addr;
 	unsigned long length;
@@ -53,7 +54,7 @@ static int do_gzwrite(cmd_tbl_t *cmdtp, int flag,
 
 	if (argc < 5)
 		return CMD_RET_USAGE;
-	ret = get_device(argv[1], argv[2], &bdev);
+	ret = blk_get_device_by_str(argv[1], argv[2], &bdev);
 	if (ret < 0)
 		return CMD_RET_FAILURE;
 

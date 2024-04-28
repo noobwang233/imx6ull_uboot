@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Based on board/freescale/common/sys_eeprom.c
  * Copyright 2006, 2008-2009, 2011 Freescale Semiconductor
@@ -7,14 +8,14 @@
  * Freescale API, but has a number of key differences. Because
  * the two APIs are independent and may diverge further, the
  * Varisys version of the API is implemented separately here.
- *
- * SPDX-License-Identifier:    GPL-2.0+
  */
 
 #include <common.h>
 #include <command.h>
+#include <env.h>
 #include <i2c.h>
 #include <linux/ctype.h>
+#include <u-boot/crc.h>
 
 #include "eeprom.h"
 
@@ -401,7 +402,7 @@ int mac_read_from_generic_eeprom(const char *envvar, int chip,
 			mac[5]);
 
 		printf("MAC: %s\n", ethaddr);
-		setenv(envvar, ethaddr);
+		env_set(envvar, ethaddr);
 	}
 
 	return ret;
@@ -486,8 +487,8 @@ int mac_read_from_eeprom_common(void)
 			/* Only initialize environment variables that are blank
 			 * (i.e. have not yet been set)
 			 */
-			if (!getenv(enetvar))
-				setenv(enetvar, ethaddr);
+			if (!env_get(enetvar))
+				env_set(enetvar, ethaddr);
 		}
 	}
 

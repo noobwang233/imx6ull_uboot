@@ -1,13 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2015 Stephen Warren
 # Copyright (c) 2015-2016, NVIDIA CORPORATION. All rights reserved.
-#
-# SPDX-License-Identifier: GPL-2.0
 
 import pytest
 import signal
 
 @pytest.mark.boardspec('sandbox')
-@pytest.mark.buildconfigspec('reset')
+@pytest.mark.buildconfigspec('sysreset')
 def test_reset(u_boot_console):
     """Test that the "reset" command exits sandbox process."""
 

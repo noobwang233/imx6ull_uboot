@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000, 2001
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -23,7 +22,9 @@
 #include <common.h>
 #include <config.h>
 #include <command.h>
+#include <eeprom.h>
 #include <i2c.h>
+#include <eeprom_layout.h>
 
 #ifndef	CONFIG_SYS_I2C_SPEED
 #define	CONFIG_SYS_I2C_SPEED	50000
@@ -35,6 +36,10 @@
 
 #ifndef CONFIG_SYS_EEPROM_PAGE_WRITE_BITS
 #define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS	8
+#endif
+
+#ifndef	I2C_RXTX_LEN
+#define I2C_RXTX_LEN	128
 #endif
 
 #define	EEPROM_PAGE_SIZE	(1 << CONFIG_SYS_EEPROM_PAGE_WRITE_BITS)
@@ -55,6 +60,10 @@
 #endif
 #endif
 
+#if defined(CONFIG_DM_I2C)
+int eeprom_i2c_bus;
+#endif
+
 __weak int eeprom_write_enable(unsigned dev_addr, int state)
 {
 	return 0;
@@ -62,17 +71,12 @@ __weak int eeprom_write_enable(unsigned dev_addr, int state)
 
 void eeprom_init(int bus)
 {
-	/* SPI EEPROM */
-#if defined(CONFIG_SPI) && !defined(CONFIG_ENV_EEPROM_IS_ON_I2C)
-	spi_init_f();
-#endif
-
 	/* I2C EEPROM */
-#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SYS_I2C_SOFT)
-#if defined(CONFIG_SYS_I2C)
+#if defined(CONFIG_DM_I2C)
+	eeprom_i2c_bus = bus;
+#elif defined(CONFIG_SYS_I2C)
 	if (bus >= 0)
 		i2c_set_bus_num(bus);
-#endif
 	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #endif
 }
@@ -105,7 +109,7 @@ static int eeprom_len(unsigned offset, unsigned end)
 
 	/*
 	 * For a FRAM device there is no limit on the number of the
-	 * bytes that can be ccessed with the single read or write
+	 * bytes that can be accessed with the single read or write
 	 * operation.
 	 */
 #if !defined(CONFIG_SYS_I2C_FRAM)
@@ -127,26 +131,32 @@ static int eeprom_rw_block(unsigned offset, uchar *addr, unsigned alen,
 {
 	int ret = 0;
 
-	/* SPI */
-#if defined(CONFIG_SPI) && !defined(CONFIG_ENV_EEPROM_IS_ON_I2C)
-	if (read)
-		spi_read(addr, alen, buffer, len);
-	else
-		spi_write(addr, alen, buffer, len);
-#else	/* I2C */
+#if defined(CONFIG_DM_I2C)
+	struct udevice *dev;
 
-#if defined(CONFIG_SYS_I2C_EEPROM_BUS)
-	i2c_set_bus_num(CONFIG_SYS_I2C_EEPROM_BUS);
-#endif
+	ret = i2c_get_chip_for_busnum(eeprom_i2c_bus, addr[0],
+				      alen - 1, &dev);
+	if (ret) {
+		printf("%s: Cannot find udev for a bus %d\n", __func__,
+		       eeprom_i2c_bus);
+		return CMD_RET_FAILURE;
+	}
+
+	if (read)
+		ret = dm_i2c_read(dev, offset, buffer, len);
+	else
+		ret = dm_i2c_write(dev, offset, buffer, len);
+
+#else /* Non DM I2C support - will be removed */
 
 	if (read)
 		ret = i2c_read(addr[0], offset, alen - 1, buffer, len);
 	else
 		ret = i2c_write(addr[0], offset, alen - 1, buffer, len);
-
+#endif /* CONFIG_DM_I2C */
 	if (ret)
-		ret = 1;
-#endif
+		ret = CMD_RET_FAILURE;
+
 	return ret;
 }
 
@@ -157,6 +167,10 @@ static int eeprom_rw(unsigned dev_addr, unsigned offset, uchar *buffer,
 	unsigned alen, len;
 	int rcode = 0;
 	uchar addr[3];
+
+#if defined(CONFIG_SYS_I2C_EEPROM_BUS)
+	eeprom_init(CONFIG_SYS_I2C_EEPROM_BUS);
+#endif
 
 	while (offset < end) {
 		alen = eeprom_addr(dev_addr, offset, addr);
@@ -203,63 +217,239 @@ int eeprom_write(unsigned dev_addr, unsigned offset,
 	return ret;
 }
 
-static int do_eeprom(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+static int parse_numeric_param(char *str)
 {
-	const char *const fmt =
-		"\nEEPROM @0x%lX %s: addr %08lx  off %04lx  count %ld ... ";
-	char * const *args = &argv[2];
-	int rcode;
-	ulong dev_addr, addr, off, cnt;
-	int bus_addr;
+	char *endptr;
+	int value = simple_strtol(str, &endptr, 16);
 
-	switch (argc) {
+	return (*endptr != '\0') ? -1 : value;
+}
+
+/**
+ * parse_i2c_bus_addr - parse the i2c bus and i2c devaddr parameters
+ *
+ * @i2c_bus:	address to store the i2c bus
+ * @i2c_addr:	address to store the device i2c address
+ * @argc:	count of command line arguments left to parse
+ * @argv:	command line arguments left to parse
+ * @argc_no_bus_addr:	argc value we expect to see when bus & addr aren't given
+ *
+ * @returns:	number of arguments parsed or CMD_RET_USAGE if error
+ */
+static int parse_i2c_bus_addr(int *i2c_bus, ulong *i2c_addr, int argc,
+			      char * const argv[], int argc_no_bus_addr)
+{
+	int argc_no_bus = argc_no_bus_addr + 1;
+	int argc_bus_addr = argc_no_bus_addr + 2;
+
 #ifdef CONFIG_SYS_DEF_EEPROM_ADDR
-	case 5:
-		bus_addr = -1;
-		dev_addr = CONFIG_SYS_DEF_EEPROM_ADDR;
-		break;
+	if (argc == argc_no_bus_addr) {
+		*i2c_bus = -1;
+		*i2c_addr = CONFIG_SYS_DEF_EEPROM_ADDR;
+
+		return 0;
+	}
 #endif
-	case 6:
-		bus_addr = -1;
-		dev_addr = simple_strtoul(*args++, NULL, 16);
-		break;
-	case 7:
-		bus_addr = simple_strtoul(*args++, NULL, 16);
-		dev_addr = simple_strtoul(*args++, NULL, 16);
-		break;
-	default:
-		return CMD_RET_USAGE;
+	if (argc == argc_no_bus) {
+		*i2c_bus = -1;
+		*i2c_addr = parse_numeric_param(argv[0]);
+
+		return 1;
 	}
 
-	addr = simple_strtoul(*args++, NULL, 16);
-	off = simple_strtoul(*args++, NULL, 16);
-	cnt = simple_strtoul(*args++, NULL, 16);
+	if (argc == argc_bus_addr) {
+		*i2c_bus = parse_numeric_param(argv[0]);
+		*i2c_addr = parse_numeric_param(argv[1]);
 
-	eeprom_init(bus_addr);
-
-	if (strcmp(argv[1], "read") == 0) {
-		printf(fmt, dev_addr, argv[1], addr, off, cnt);
-
-		rcode = eeprom_read(dev_addr, off, (uchar *)addr, cnt);
-
-		puts("done\n");
-		return rcode;
-	} else if (strcmp(argv[1], "write") == 0) {
-		printf(fmt, dev_addr, argv[1], addr, off, cnt);
-
-		rcode = eeprom_write(dev_addr, off, (uchar *)addr, cnt);
-
-		puts("done\n");
-		return rcode;
+		return 2;
 	}
 
 	return CMD_RET_USAGE;
 }
 
+#ifdef CONFIG_CMD_EEPROM_LAYOUT
+
+__weak int eeprom_parse_layout_version(char *str)
+{
+	return LAYOUT_VERSION_UNRECOGNIZED;
+}
+
+static unsigned char eeprom_buf[CONFIG_SYS_EEPROM_SIZE];
+
+#endif
+
+enum eeprom_action {
+	EEPROM_READ,
+	EEPROM_WRITE,
+	EEPROM_PRINT,
+	EEPROM_UPDATE,
+	EEPROM_ACTION_INVALID,
+};
+
+static enum eeprom_action parse_action(char *cmd)
+{
+	if (!strncmp(cmd, "read", 4))
+		return EEPROM_READ;
+	if (!strncmp(cmd, "write", 5))
+		return EEPROM_WRITE;
+#ifdef CONFIG_CMD_EEPROM_LAYOUT
+	if (!strncmp(cmd, "print", 5))
+		return EEPROM_PRINT;
+	if (!strncmp(cmd, "update", 6))
+		return EEPROM_UPDATE;
+#endif
+
+	return EEPROM_ACTION_INVALID;
+}
+
+static int eeprom_execute_command(enum eeprom_action action, int i2c_bus,
+				  ulong i2c_addr, int layout_ver, char *key,
+				  char *value, ulong addr, ulong off, ulong cnt)
+{
+	int rcode = 0;
+	const char *const fmt =
+		"\nEEPROM @0x%lX %s: addr 0x%08lx  off 0x%04lx  count %ld ... ";
+#ifdef CONFIG_CMD_EEPROM_LAYOUT
+	struct eeprom_layout layout;
+#endif
+
+	if (action == EEPROM_ACTION_INVALID)
+		return CMD_RET_USAGE;
+
+	eeprom_init(i2c_bus);
+	if (action == EEPROM_READ) {
+		printf(fmt, i2c_addr, "read", addr, off, cnt);
+
+		rcode = eeprom_read(i2c_addr, off, (uchar *)addr, cnt);
+
+		puts("done\n");
+		return rcode;
+	} else if (action == EEPROM_WRITE) {
+		printf(fmt, i2c_addr, "write", addr, off, cnt);
+
+		rcode = eeprom_write(i2c_addr, off, (uchar *)addr, cnt);
+
+		puts("done\n");
+		return rcode;
+	}
+
+#ifdef CONFIG_CMD_EEPROM_LAYOUT
+	rcode = eeprom_read(i2c_addr, 0, eeprom_buf, CONFIG_SYS_EEPROM_SIZE);
+	if (rcode < 0)
+		return rcode;
+
+	eeprom_layout_setup(&layout, eeprom_buf, CONFIG_SYS_EEPROM_SIZE,
+			    layout_ver);
+
+	if (action == EEPROM_PRINT) {
+		layout.print(&layout);
+		return 0;
+	}
+
+	layout.update(&layout, key, value);
+
+	rcode = eeprom_write(i2c_addr, 0, layout.data, CONFIG_SYS_EEPROM_SIZE);
+#endif
+
+	return rcode;
+}
+
+#define NEXT_PARAM(argc, index)	{ (argc)--; (index)++; }
+int do_eeprom(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	int layout_ver = LAYOUT_VERSION_AUTODETECT;
+	enum eeprom_action action = EEPROM_ACTION_INVALID;
+	int i2c_bus = -1, index = 0;
+	ulong i2c_addr = -1, addr = 0, cnt = 0, off = 0;
+	int ret;
+	char *field_name = "";
+	char *field_value = "";
+
+	if (argc <= 1)
+		return CMD_RET_USAGE;
+
+	NEXT_PARAM(argc, index); /* Skip program name */
+
+	action = parse_action(argv[index]);
+	NEXT_PARAM(argc, index);
+
+	if (action == EEPROM_ACTION_INVALID)
+		return CMD_RET_USAGE;
+
+#ifdef CONFIG_CMD_EEPROM_LAYOUT
+	if (action == EEPROM_PRINT || action == EEPROM_UPDATE) {
+		if (!strcmp(argv[index], "-l")) {
+			NEXT_PARAM(argc, index);
+			layout_ver = eeprom_parse_layout_version(argv[index]);
+			NEXT_PARAM(argc, index);
+		}
+	}
+#endif
+
+	switch (action) {
+	case EEPROM_READ:
+	case EEPROM_WRITE:
+		ret = parse_i2c_bus_addr(&i2c_bus, &i2c_addr, argc,
+					 argv + index, 3);
+		break;
+	case EEPROM_PRINT:
+		ret = parse_i2c_bus_addr(&i2c_bus, &i2c_addr, argc,
+					 argv + index, 0);
+		break;
+	case EEPROM_UPDATE:
+		ret = parse_i2c_bus_addr(&i2c_bus, &i2c_addr, argc,
+					 argv + index, 2);
+		break;
+	default:
+		/* Get compiler to stop whining */
+		return CMD_RET_USAGE;
+	}
+
+	if (ret == CMD_RET_USAGE)
+		return ret;
+
+	while (ret--)
+		NEXT_PARAM(argc, index);
+
+	if (action == EEPROM_READ || action == EEPROM_WRITE) {
+		addr = parse_numeric_param(argv[index]);
+		NEXT_PARAM(argc, index);
+		off = parse_numeric_param(argv[index]);
+		NEXT_PARAM(argc, index);
+		cnt = parse_numeric_param(argv[index]);
+	}
+
+#ifdef CONFIG_CMD_EEPROM_LAYOUT
+	if (action == EEPROM_UPDATE) {
+		field_name = argv[index];
+		NEXT_PARAM(argc, index);
+		field_value = argv[index];
+		NEXT_PARAM(argc, index);
+	}
+#endif
+
+	return eeprom_execute_command(action, i2c_bus, i2c_addr, layout_ver,
+				      field_name, field_value, addr, off, cnt);
+}
+
 U_BOOT_CMD(
-	eeprom,	7,	1,	do_eeprom,
+	eeprom,	8,	1,	do_eeprom,
 	"EEPROM sub-system",
 	"read  <bus> <devaddr> addr off cnt\n"
 	"eeprom write <bus> <devaddr> addr off cnt\n"
 	"       - read/write `cnt' bytes from `devaddr` EEPROM at offset `off'"
+#ifdef CONFIG_CMD_EEPROM_LAYOUT
+	"\n"
+	"eeprom print [-l <layout_version>] <bus> <devaddr>\n"
+	"       - Print layout fields and their data in human readable format\n"
+	"eeprom update [-l <layout_version>] <bus> <devaddr> field_name field_value\n"
+	"       - Update a specific eeprom field with new data.\n"
+	"         The new data must be written in the same human readable format as shown by the print command.\n"
+	"\n"
+	"LAYOUT VERSIONS\n"
+	"The -l option can be used to force the command to interpret the EEPROM data using the chosen layout.\n"
+	"If the -l option is omitted, the command will auto detect the layout based on the data in the EEPROM.\n"
+	"The values which can be provided with the -l option are:\n"
+	CONFIG_EEPROM_LAYOUT_HELP_STRING"\n"
+#endif
 )

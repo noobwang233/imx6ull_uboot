@@ -1,15 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Peng Fan <van.freenix@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <dm/device.h>
+#include <common.h>
+#include <dm.h>
 #include <dm/pinctrl.h>
 
 #include "pinctrl-imx.h"
 
-static struct imx_pinctrl_soc_info imx7_pinctrl_soc_info;
+static struct imx_pinctrl_soc_info imx7_pinctrl_soc_info __attribute__ ((section(".data")));
 
 static struct imx_pinctrl_soc_info imx7_lpsr_pinctrl_soc_info = {
 	.flags = ZERO_OFFSET_VALID,

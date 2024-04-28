@@ -2,19 +2,33 @@
 #define _LINUX_BITOPS_H
 
 #include <asm/types.h>
+#include <asm-generic/bitsperlong.h>
 #include <linux/compiler.h>
+#include <linux/kernel.h>
 
+#ifdef	__KERNEL__
 #define BIT(nr)			(1UL << (nr))
+#define BIT_ULL(nr)		(1ULL << (nr))
 #define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
 #define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
+#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
+#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
+#define BITS_PER_BYTE		8
+#define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
+#endif
 
 /*
  * Create a contiguous bitmask starting at bit position @l and ending at
  * position @h. For example
  * GENMASK_ULL(39, 21) gives us the 64bit vector 0x000000ffffe00000.
  */
+#ifdef CONFIG_SANDBOX
+#define GENMASK(h, l) \
+	(((~0UL) << (l)) & (~0UL >> (CONFIG_SANDBOX_BITS_PER_LONG - 1 - (h))))
+#else
 #define GENMASK(h, l) \
 	(((~0UL) << (l)) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
+#endif
 
 #define GENMASK_ULL(h, l) \
 	(((~0ULL) << (l)) & (~0ULL >> (BITS_PER_LONG_LONG - 1 - (h))))
@@ -118,6 +132,17 @@ static inline unsigned int generic_hweight8(unsigned int w)
 	unsigned int res = (w & 0x55) + ((w >> 1) & 0x55);
 	res = (res & 0x33) + ((res >> 2) & 0x33);
 	return (res & 0x0F) + ((res >> 4) & 0x0F);
+}
+
+static inline unsigned long generic_hweight64(__u64 w)
+{
+	return generic_hweight32((unsigned int)(w >> 32)) +
+	       generic_hweight32((unsigned int)w);
+}
+
+static inline unsigned long hweight_long(unsigned long w)
+{
+	return sizeof(w) == 4 ? generic_hweight32(w) : generic_hweight64(w);
 }
 
 #include <asm/bitops.h>

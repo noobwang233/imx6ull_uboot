@@ -1,15 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2015 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
+ * Copyright 2019 NXP
  */
 
 #include <common.h>
 #include <asm/io.h>
 #include <netdev.h>
+#include <fdt_support.h>
 #include <fm_eth.h>
 #include <fsl_mdio.h>
 #include <fsl_dtsec.h>
+#include <linux/libfdt.h>
 #include <malloc.h>
 #include <asm/arch/fsl_serdes.h>
 
@@ -160,23 +162,23 @@ void board_ft_fman_fixup_port(void *fdt, char *compat, phys_addr_t addr,
 	if (fm_info_get_enet_if(port) == PHY_INTERFACE_MODE_SGMII) {
 		if (port == FM1_DTSEC9) {
 			fdt_set_phy_handle(fdt, compat, addr,
-					   "sgmii_riser_s1_p1");
+					   "sgmii-riser-s1-p1");
 		} else if (port == FM1_DTSEC2) {
 			fdt_set_phy_handle(fdt, compat, addr,
-					   "sgmii_riser_s2_p1");
+					   "sgmii-riser-s2-p1");
 		} else if (port == FM1_DTSEC5) {
 			fdt_set_phy_handle(fdt, compat, addr,
-					   "sgmii_riser_s3_p1");
+					   "sgmii-riser-s3-p1");
 		} else if (port == FM1_DTSEC6) {
 			fdt_set_phy_handle(fdt, compat, addr,
-					   "sgmii_riser_s4_p1");
+					   "sgmii-riser-s4-p1");
 		}
 	} else if (fm_info_get_enet_if(port) ==
 		   PHY_INTERFACE_MODE_SGMII_2500) {
 		/* 2.5G SGMII interface */
-		f_link.phy_id = port;
-		f_link.duplex = 1;
-		f_link.link_speed = 1000;
+		f_link.phy_id = cpu_to_fdt32(port);
+		f_link.duplex = cpu_to_fdt32(1);
+		f_link.link_speed = cpu_to_fdt32(1000);
 		f_link.pause = 0;
 		f_link.asym_pause = 0;
 		/* no PHY for 2.5G SGMII */
@@ -190,19 +192,19 @@ void board_ft_fman_fixup_port(void *fdt, char *compat, phys_addr_t addr,
 			switch (port) {
 			case FM1_DTSEC1:
 				fdt_set_phy_handle(fdt, compat, addr,
-						   "qsgmii_s1_p1");
+						   "qsgmii-s1-p1");
 				break;
 			case FM1_DTSEC2:
 				fdt_set_phy_handle(fdt, compat, addr,
-						   "qsgmii_s1_p2");
+						   "qsgmii-s1-p2");
 				break;
 			case FM1_DTSEC5:
 				fdt_set_phy_handle(fdt, compat, addr,
-						   "qsgmii_s1_p3");
+						   "qsgmii-s1-p3");
 				break;
 			case FM1_DTSEC6:
 				fdt_set_phy_handle(fdt, compat, addr,
-						   "qsgmii_s1_p4");
+						   "qsgmii-s1-p4");
 				break;
 			default:
 				break;
@@ -212,19 +214,19 @@ void board_ft_fman_fixup_port(void *fdt, char *compat, phys_addr_t addr,
 			switch (port) {
 			case FM1_DTSEC1:
 				fdt_set_phy_handle(fdt, compat, addr,
-						   "qsgmii_s2_p1");
+						   "qsgmii-s2-p1");
 				break;
 			case FM1_DTSEC2:
 				fdt_set_phy_handle(fdt, compat, addr,
-						   "qsgmii_s2_p2");
+						   "qsgmii-s2-p2");
 				break;
 			case FM1_DTSEC5:
 				fdt_set_phy_handle(fdt, compat, addr,
-						   "qsgmii_s2_p3");
+						   "qsgmii-s2-p3");
 				break;
 			case FM1_DTSEC6:
 				fdt_set_phy_handle(fdt, compat, addr,
-						   "qsgmii_s2_p4");
+						   "qsgmii-s2-p4");
 				break;
 			default:
 				break;
@@ -239,9 +241,9 @@ void board_ft_fman_fixup_port(void *fdt, char *compat, phys_addr_t addr,
 	} else if (fm_info_get_enet_if(port) == PHY_INTERFACE_MODE_XGMII &&
 		   port == FM1_10GEC1) {
 		/* XFI interface */
-		f_link.phy_id = port;
-		f_link.duplex = 1;
-		f_link.link_speed = 10000;
+		f_link.phy_id = cpu_to_fdt32(port);
+		f_link.duplex = cpu_to_fdt32(1);
+		f_link.link_speed = cpu_to_fdt32(10000);
 		f_link.pause = 0;
 		f_link.asym_pause = 0;
 		/* no PHY for XFI */
@@ -267,16 +269,16 @@ void fdt_fixup_board_enet(void *fdt)
 		case PHY_INTERFACE_MODE_QSGMII:
 			switch (mdio_mux[i]) {
 			case EMI1_SLOT1:
-				fdt_status_okay_by_alias(fdt, "emi1_slot1");
+				fdt_status_okay_by_alias(fdt, "emi1-slot1");
 				break;
 			case EMI1_SLOT2:
-				fdt_status_okay_by_alias(fdt, "emi1_slot2");
+				fdt_status_okay_by_alias(fdt, "emi1-slot2");
 				break;
 			case EMI1_SLOT3:
-				fdt_status_okay_by_alias(fdt, "emi1_slot3");
+				fdt_status_okay_by_alias(fdt, "emi1-slot3");
 				break;
 			case EMI1_SLOT4:
-				fdt_status_okay_by_alias(fdt, "emi1_slot4");
+				fdt_status_okay_by_alias(fdt, "emi1-slot4");
 				break;
 			default:
 				break;
@@ -474,6 +476,7 @@ int board_eth_init(bd_t *bis)
 			}
 			break;
 		case PHY_INTERFACE_MODE_RGMII:
+		case PHY_INTERFACE_MODE_RGMII_TXID:
 			if (i == FM1_DTSEC3)
 				mdio_mux[i] = EMI1_RGMII1;
 			else if (i == FM1_DTSEC4)

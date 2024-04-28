@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) ARM Ltd 2015
  *
  * Author: Liviu Dudau <Liviu.Dudau@arm.com>
- *
- * SPDX-Licence-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -123,7 +122,7 @@ void xr3pci_setup_atr(void)
 	base += XR3PCI_ATR_TABLE_SIZE;
 
 	/* setup IO space translation */
-	xr3pci_set_atr_entry(base, XR3_PCI_IOSPACE_START, XR3_PCI_IOSPACE_START,
+	xr3pci_set_atr_entry(base, XR3_PCI_IOSPACE_START, 0,
 			     XR3_PCI_IOSPACE_SIZE, XR3PCI_ATR_TRSLID_PCIE_IO);
 
 	base += XR3PCI_ATR_TABLE_SIZE;

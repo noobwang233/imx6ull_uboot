@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * FSL PAMU driver
  *
  * Copyright 2012-2016 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -132,10 +131,10 @@ static int pamu_config_ppaace(uint32_t liodn, uint64_t win_addr,
 		set_bf(ppaace->addr_bitfields, PAACE_AF_AP, PAACE_AP_PERMS_ALL);
 	}
 
-	asm volatile("sync" : : : "memory");
+	sync();
 	/* Mark the ppace entry valid */
 	ppaace->addr_bitfields |= PAACE_V_VALID;
-	asm volatile("sync" : : : "memory");
+	sync();
 
 	return 0;
 }
@@ -239,15 +238,23 @@ int pamu_init(void)
 	spaact_size = sizeof(struct paace) * NUM_SPAACT_ENTRIES;
 
 	/* Allocate space for Primary PAACT Table */
+#if (defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_PPAACT_ADDR))
+	ppaact = (void *)CONFIG_SPL_PPAACT_ADDR;
+#else
 	ppaact = memalign(PAMU_TABLE_ALIGNMENT, ppaact_size);
 	if (!ppaact)
 		return -1;
+#endif
 	memset(ppaact, 0, ppaact_size);
 
 	/* Allocate space for Secondary PAACT Table */
+#if (defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_SPAACT_ADDR))
+	sec = (void *)CONFIG_SPL_SPAACT_ADDR;
+#else
 	sec = memalign(PAMU_TABLE_ALIGNMENT, spaact_size);
 	if (!sec)
 		return -1;
+#endif
 	memset(sec, 0, spaact_size);
 
 	ppaact_phys = virt_to_phys((void *)ppaact);
@@ -272,7 +279,7 @@ int pamu_init(void)
 			out_be32(&regs->splah, spaact_lim >> 32);
 			out_be32(&regs->splal, (uint32_t)spaact_lim);
 		}
-		asm volatile("sync" : : : "memory");
+		sync();
 
 		base_addr += PAMU_OFFSET;
 	}
@@ -287,7 +294,7 @@ void pamu_enable(void)
 	for (i = 0; i < CONFIG_NUM_PAMU; i++) {
 		setbits_be32((void *)base_addr + PAMU_PCR_OFFSET,
 			     PAMU_PCR_PE);
-		asm volatile("sync" : : : "memory");
+		sync();
 		base_addr += PAMU_OFFSET;
 	}
 }
@@ -311,7 +318,7 @@ void pamu_reset(void)
 		out_be32(&regs->splal, 0);
 
 		clrbits_be32((void *)regs + PAMU_PCR_OFFSET, PAMU_PCR_PE);
-		asm volatile("sync" : : : "memory");
+		sync();
 		base_addr += PAMU_OFFSET;
 	}
 }
@@ -324,7 +331,7 @@ void pamu_disable(void)
 
 	for (i = 0; i < CONFIG_NUM_PAMU; i++) {
 		clrbits_be32((void *)base_addr + PAMU_PCR_OFFSET, PAMU_PCR_PE);
-		asm volatile("sync" : : : "memory");
+		sync();
 		base_addr += PAMU_OFFSET;
 	}
 }

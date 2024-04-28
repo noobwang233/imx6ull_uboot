@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright 2011-2016 Freescale Semiconductor, Inc. All Rights Reserved.
- *
- * SPDX-License-Identifier:	GPL-2.0+
+ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
  */
 
 #ifndef __ARCH_ARM_MACH_MX6_CCM_REGS_H__
@@ -325,8 +324,8 @@ struct mxc_ccm_reg {
 #define MXC_CCM_CSCMR1_LCDIF2_PODF_MASK			(0x7 << 20)
 #define MXC_CCM_CSCMR1_LCDIF2_PODF_OFFSET               20
 /* LCDIF_PIX_PODF on i.MX6SL */
-#define MXC_CCM_CSCMR1_LCDIF_PIX_PODF_MASK			(0x7 << 20)
-#define MXC_CCM_CSCMR1_LCDIF_PIX_PODF_OFFSET               20
+#define MXC_CCM_CSCMR1_LCDIF_PIX_PODF_MASK		(0x7 << 20)
+#define MXC_CCM_CSCMR1_LCDIF_PIX_PODF_OFFSET		20
 /* ACLK_EMI on i.MX6DQ/SDL/DQP */
 #define MXC_CCM_CSCMR1_ACLK_EMI_PODF_MASK		(0x7 << 20)
 #define MXC_CCM_CSCMR1_ACLK_EMI_PODF_OFFSET		20
@@ -449,15 +448,15 @@ struct mxc_ccm_reg {
 #define MXC_CCM_CS2CDR_ENFC_CLK_SEL_DQ(v)		(((v) & 0x3) << 16)
 
 #define MXC_CCM_CS2CDR_ENFC_CLK_SEL_MASK		\
-	((is_mx6dqp() || is_cpu_type(MXC_CPU_MX6UL) || is_cpu_type(MXC_CPU_MX6ULL)) ? \
+	((is_mx6dqp() || is_mx6ul() || is_mx6ull()) ? \
 	 MXC_CCM_CS2CDR_ENFC_CLK_SEL_MASK_DQP :		\
 	 MXC_CCM_CS2CDR_ENFC_CLK_SEL_MASK_DQ)
 #define MXC_CCM_CS2CDR_ENFC_CLK_SEL_OFFSET		\
-	((is_mx6dqp() || is_cpu_type(MXC_CPU_MX6UL) || is_cpu_type(MXC_CPU_MX6ULL)) ? \
+	((is_mx6dqp() || is_mx6ul() || is_mx6ull()) ? \
 	 MXC_CCM_CS2CDR_ENFC_CLK_SEL_OFFSET_DQP :	\
 	 MXC_CCM_CS2CDR_ENFC_CLK_SEL_OFFSET_DQ)
 #define MXC_CCM_CS2CDR_ENFC_CLK_SEL(v)			\
-	((is_mx6dqp() || is_cpu_type(MXC_CPU_MX6UL) || is_cpu_type(MXC_CPU_MX6ULL)) ? \
+	((is_mx6dqp() || is_mx6ul() || is_mx6ull()) ? \
 	 MXC_CCM_CS2CDR_ENFC_CLK_SEL_DQP(v) :		\
 	 MXC_CCM_CS2CDR_ENFC_CLK_SEL_DQ(v))
 
@@ -490,7 +489,7 @@ struct mxc_ccm_reg {
 #define MXC_CCM_CDCDR_SPDIF1_CLK_SEL_OFFSET		7
 
 /* Define the bits in register CHSCCDR */
-/* i.MX 6SX */
+/* i.MX6SX */
 #define MXC_CCM_CHSCCDR_ENET_PRE_CLK_SEL_MASK		(0x7 << 15)
 #define MXC_CCM_CHSCCDR_ENET_PRE_CLK_SEL_OFFSET		15
 #define MXC_CCM_CHSCCDR_ENET_PODF_MASK			(0x7 << 12)
@@ -521,7 +520,7 @@ struct mxc_ccm_reg {
 #define MXC_CCM_CHSCCDR_EPDC_PRE_CLK_SEL_MASK		(0x7 << 15)
 #define MXC_CCM_CHSCCDR_EPDC_PRE_CLK_SEL_OFFSET		15
 #define MXC_CCM_CHSCCDR_EPDC_PODF_MASK			(0x7 << 12)
-#define MXC_CCM_CHSCCDR_EPDC_PODF_OFFSET			12
+#define MXC_CCM_CHSCCDR_EPDC_PODF_OFFSET		12
 #define MXC_CCM_CHSCCDR_EPDC_CLK_SEL_MASK		(0x7 << 9)
 #define MXC_CCM_CHSCCDR_EPDC_CLK_SEL_OFFSET		9
 
@@ -557,11 +556,10 @@ struct mxc_ccm_reg {
 #define MXC_CCM_CSCDR2_LCDIF2_CLK_SEL_OFFSET             0
 
 /*LCD on i.MX6SL */
-#define MXC_CCM_CSCDR2_LCDIF_PIX_CLK_SEL_MASK             (0x7 << 6)
-#define MXC_CCM_CSCDR2_LCDIF_PIX_CLK_SEL_OFFSET           6
-#define MXC_CCM_CSCDR2_LCDIF_PIX_PRE_DIV_MASK              (0x7 << 3)
-#define MXC_CCM_CSCDR2_LCDIF_PIX_PRE_DIV_OFFSET            3
-
+#define MXC_CCM_CSCDR2_LCDIF_PIX_CLK_SEL_MASK		(0x7 << 6)
+#define MXC_CCM_CSCDR2_LCDIF_PIX_CLK_SEL_OFFSET		6
+#define MXC_CCM_CSCDR2_LCDIF_PIX_PRE_DIV_MASK		(0x7 << 3)
+#define MXC_CCM_CSCDR2_LCDIF_PIX_PRE_DIV_OFFSET		3
 
 /* All IPU2_DI1 are LCDIF1 on MX6SX */
 #define MXC_CCM_CHSCCDR_IPU2_DI1_PRE_CLK_SEL_MASK	(0x7 << 15)
@@ -603,7 +601,6 @@ struct mxc_ccm_reg {
 #define MXC_CCM_CSCDR3_PXP_PODF_OFFSET		16
 #define MXC_CCM_CSCDR3_PXP_CLK_SEL_MASK		(0x3 << 14)
 #define MXC_CCM_CSCDR3_PXP_CLK_SEL_OFFSET		14
-
 
 /* Define the bits in register CDHIPR */
 #define MXC_CCM_CDHIPR_ARM_PODF_BUSY			(1 << 16)
@@ -778,7 +775,6 @@ struct mxc_ccm_reg {
 
 #define MXC_CCM_CCGR2_HDMI_TX_IAHBCLK_OFFSET		0
 #define MXC_CCM_CCGR2_HDMI_TX_IAHBCLK_MASK		(3 << MXC_CCM_CCGR2_HDMI_TX_IAHBCLK_OFFSET)
-
 /* i.MX6SX/UL */
 #define MXC_CCM_CCGR2_CSI_OFFSET			2
 #define MXC_CCM_CCGR2_CSI_MASK				(3 << MXC_CCM_CCGR2_CSI_OFFSET)
@@ -821,8 +817,8 @@ struct mxc_ccm_reg {
 /* i.MX6ULL */
 #define MXC_CCM_CCGR2_ESAI_CLK_OFFSET		0
 #define MXC_CCM_CCGR2_ESAI_CLK_MASK		(3 << MXC_CCM_CCGR2_ESAI_CLK_OFFSET)
-#define MXC_CCM_CCGR2_IOMUXC_SNVS_CLK_OFFSET		4
-#define MXC_CCM_CCGR2_IOMUXC_SNVS_CLK_MASK		(3 << MXC_CCM_CCGR2_IOMUXC_SNVS_CLK_OFFSET)
+#define MXC_CCM_CCGR2_IOMUXC_SNVS_CLK_OFFSET	4
+#define MXC_CCM_CCGR2_IOMUXC_SNVS_CLK_MASK	(3 << MXC_CCM_CCGR2_IOMUXC_SNVS_CLK_OFFSET)
 
 /* Exist on i.MX6SX */
 #define MXC_CCM_CCGR3_M4_OFFSET					2
@@ -1337,6 +1333,7 @@ struct mxc_ccm_reg {
 	(((v) << 0) & BM_ANADIG_PFD_528_PFD0_FRAC)
 
 #define BM_ANADIG_ANA_MISC0_REFTOP_SELBIASOFF 0x00000008
+#define BM_ANADIG_ANA_MISC0_REFTOP_VBGADJ 0x60
 #define BM_ANADIG_ANA_MISC0_REFTOP_VBGADJ_SHIFT 4
 
 #define BM_PMU_MISC2_AUDIO_DIV_MSB (1 << 23)

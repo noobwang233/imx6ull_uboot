@@ -1,11 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2014-2016 Stefan Roese <sr@denx.de>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <ahci.h>
+#include <cpu_func.h>
 #include <linux/mbus.h>
 #include <asm/io.h>
 #include <asm/pl310.h>
@@ -24,6 +24,11 @@ static struct mbus_win windows[] = {
 	/* NOR */
 	{ MBUS_BOOTROM_BASE, MBUS_BOOTROM_SIZE,
 	  CPU_TARGET_DEVICEBUS_BOOTROM_SPI, CPU_ATTR_BOOTROM },
+
+#ifdef CONFIG_ARMADA_MSYS
+	/* DFX */
+	{ MBUS_DFX_BASE, MBUS_DFX_SIZE, CPU_TARGET_DFX, 0 },
+#endif
 };
 
 void lowlevel_init(void)
@@ -54,25 +59,80 @@ int mvebu_soc_family(void)
 	case SOC_MV78260_ID:
 	case SOC_MV78460_ID:
 		return MVEBU_SOC_AXP;
+
+	case SOC_88F6720_ID:
+		return MVEBU_SOC_A375;
+
 	case SOC_88F6810_ID:
 	case SOC_88F6820_ID:
 	case SOC_88F6828_ID:
 		return MVEBU_SOC_A38X;
+
+	case SOC_98DX3236_ID:
+	case SOC_98DX3336_ID:
+	case SOC_98DX4251_ID:
+		return MVEBU_SOC_MSYS;
 	}
+
 	return MVEBU_SOC_UNKNOWN;
 }
 
 #if defined(CONFIG_DISPLAY_CPUINFO)
 
-#if defined(CONFIG_ARMADA_38X)
+#if defined(CONFIG_ARMADA_375)
+/* SAR frequency values for Armada 375 */
+static const struct sar_freq_modes sar_freq_tab[] = {
+	{  0,  0x0,  266,  133,  266 },
+	{  1,  0x0,  333,  167,  167 },
+	{  2,  0x0,  333,  167,  222 },
+	{  3,  0x0,  333,  167,  333 },
+	{  4,  0x0,  400,  200,  200 },
+	{  5,  0x0,  400,  200,  267 },
+	{  6,  0x0,  400,  200,  400 },
+	{  7,  0x0,  500,  250,  250 },
+	{  8,  0x0,  500,  250,  334 },
+	{  9,  0x0,  500,  250,  500 },
+	{ 10,  0x0,  533,  267,  267 },
+	{ 11,  0x0,  533,  267,  356 },
+	{ 12,  0x0,  533,  267,  533 },
+	{ 13,  0x0,  600,  300,  300 },
+	{ 14,  0x0,  600,  300,  400 },
+	{ 15,  0x0,  600,  300,  600 },
+	{ 16,  0x0,  666,  333,  333 },
+	{ 17,  0x0,  666,  333,  444 },
+	{ 18,  0x0,  666,  333,  666 },
+	{ 19,  0x0,  800,  400,  267 },
+	{ 20,  0x0,  800,  400,  400 },
+	{ 21,  0x0,  800,  400,  534 },
+	{ 22,  0x0,  900,  450,  300 },
+	{ 23,  0x0,  900,  450,  450 },
+	{ 24,  0x0,  900,  450,  600 },
+	{ 25,  0x0, 1000,  500,  500 },
+	{ 26,  0x0, 1000,  500,  667 },
+	{ 27,  0x0, 1000,  333,  500 },
+	{ 28,  0x0,  400,  400,  400 },
+	{ 29,  0x0, 1100,  550,  550 },
+	{ 0xff, 0xff,    0,   0,   0 }	/* 0xff marks end of array */
+};
+#elif defined(CONFIG_ARMADA_38X)
 /* SAR frequency values for Armada 38x */
 static const struct sar_freq_modes sar_freq_tab[] = {
-	{  0x0,  0x0,  666, 333, 333 },
-	{  0x2,  0x0,  800, 400, 400 },
-	{  0x4,  0x0, 1066, 533, 533 },
-	{  0x6,  0x0, 1200, 600, 600 },
-	{  0x8,  0x0, 1332, 666, 666 },
-	{  0xc,  0x0, 1600, 800, 800 },
+	{  0x0,  0x0,  666,  333, 333 },
+	{  0x2,  0x0,  800,  400, 400 },
+	{  0x4,  0x0, 1066,  533, 533 },
+	{  0x6,  0x0, 1200,  600, 600 },
+	{  0x8,  0x0, 1332,  666, 666 },
+	{  0xc,  0x0, 1600,  800, 800 },
+	{ 0x10,  0x0, 1866,  933, 933 },
+	{ 0x13,  0x0, 2000, 1000, 933 },
+	{ 0xff, 0xff,    0,    0,   0 }	/* 0xff marks end of array */
+};
+#elif defined(CONFIG_ARMADA_MSYS)
+static const struct sar_freq_modes sar_freq_tab[] = {
+	{  0x0,	0x0,  400,  400, 400 },
+	{  0x2, 0x0,  667,  333, 667 },
+	{  0x3, 0x0,  800,  400, 800 },
+	{  0x5, 0x0,  800,  400, 800 },
 	{ 0xff, 0xff,    0,   0,   0 }	/* 0xff marks end of array */
 };
 #else
@@ -98,9 +158,13 @@ void get_sar_freq(struct sar_freq_modes *sar_freq)
 	u32 freq;
 	int i;
 
+#if defined(CONFIG_ARMADA_375) || defined(CONFIG_ARMADA_MSYS)
+	val = readl(CONFIG_SAR2_REG);	/* SAR - Sample At Reset */
+#else
 	val = readl(CONFIG_SAR_REG);	/* SAR - Sample At Reset */
+#endif
 	freq = (val & SAR_CPU_FREQ_MASK) >> SAR_CPU_FREQ_OFFS;
-#if !defined(CONFIG_ARMADA_38X)
+#if defined(SAR2_CPU_FREQ_MASK)
 	/*
 	 * Shift CPU0 clock frequency select bit from SAR2 register
 	 * into correct position
@@ -110,7 +174,7 @@ void get_sar_freq(struct sar_freq_modes *sar_freq)
 #endif
 	for (i = 0; sar_freq_tab[i].val != 0xff; i++) {
 		if (sar_freq_tab[i].val == freq) {
-#if defined(CONFIG_ARMADA_38X)
+#if defined(CONFIG_ARMADA_375) || defined(CONFIG_ARMADA_38X) || defined(CONFIG_ARMADA_MSYS)
 			*sar_freq = sar_freq_tab[i];
 			return;
 #else
@@ -152,6 +216,9 @@ int print_cpuinfo(void)
 	case SOC_MV78460_ID:
 		puts("MV78460-");
 		break;
+	case SOC_88F6720_ID:
+		puts("MV88F6720-");
+		break;
 	case SOC_88F6810_ID:
 		puts("MV88F6810-");
 		break;
@@ -160,6 +227,15 @@ int print_cpuinfo(void)
 		break;
 	case SOC_88F6828_ID:
 		puts("MV88F6828-");
+		break;
+	case SOC_98DX3236_ID:
+		puts("98DX3236-");
+		break;
+	case SOC_98DX3336_ID:
+		puts("98DX3336-");
+		break;
+	case SOC_98DX4251_ID:
+		puts("98DX4251-");
 		break;
 	default:
 		puts("Unknown-");
@@ -180,6 +256,17 @@ int print_cpuinfo(void)
 		}
 	}
 
+	if (mvebu_soc_family() == MVEBU_SOC_A375) {
+		switch (revid) {
+		case MV_88F67XX_A0_ID:
+			puts("A0");
+			break;
+		default:
+			printf("?? (%x)", revid);
+			break;
+		}
+	}
+
 	if (mvebu_soc_family() == MVEBU_SOC_A38X) {
 		switch (revid) {
 		case MV_88F68XX_Z1_ID:
@@ -187,6 +274,23 @@ int print_cpuinfo(void)
 			break;
 		case MV_88F68XX_A0_ID:
 			puts("A0");
+			break;
+		case MV_88F68XX_B0_ID:
+			puts("B0");
+			break;
+		default:
+			printf("?? (%x)", revid);
+			break;
+		}
+	}
+
+	if (mvebu_soc_family() == MVEBU_SOC_MSYS) {
+		switch (revid) {
+		case 3:
+			puts("A0");
+			break;
+		case 4:
+			puts("A1");
 			break;
 		default:
 			printf("?? (%x)", revid);
@@ -207,10 +311,8 @@ int print_cpuinfo(void)
  * and sets the correct windows sizes and base addresses accordingly.
  *
  * These values are set in the scratch registers by the Marvell
- * DDR3 training code, which is executed by the BootROM before the
- * main payload (U-Boot) is executed. This training code is currently
- * only available in the Marvell U-Boot version. It needs to be
- * ported to mainline U-Boot SPL at some point.
+ * DDR3 training code, which is executed by the SPL before the
+ * main payload (U-Boot) is executed.
  */
 static void update_sdram_window_sizes(void)
 {
@@ -394,8 +496,17 @@ int arch_cpu_init(void)
 
 u32 mvebu_get_nand_clock(void)
 {
+	u32 reg;
+
+	if (mvebu_soc_family() == MVEBU_SOC_A38X)
+		reg = MVEBU_DFX_DIV_CLK_CTRL(1);
+	else if (mvebu_soc_family() == MVEBU_SOC_MSYS)
+		reg = MVEBU_DFX_DIV_CLK_CTRL(8);
+	else
+		reg = MVEBU_CORE_DIV_CLK_CTRL(1);
+
 	return CONFIG_SYS_MVEBU_PLL_CLOCK /
-		((readl(MVEBU_CORE_DIV_CLK_CTRL(1)) &
+		((readl(reg) &
 		  NAND_ECC_DIVCKL_RATIO_MASK) >> NAND_ECC_DIVCKL_RATIO_OFFS);
 }
 
@@ -410,7 +521,7 @@ int arch_misc_init(void)
 }
 #endif /* CONFIG_ARCH_MISC_INIT */
 
-#ifdef CONFIG_MV_SDHCI
+#if defined(CONFIG_MMC_SDHCI_MV) && !defined(CONFIG_DM_MMC)
 int board_mmc_init(bd_t *bis)
 {
 	mv_sdh_init(MVEBU_SDIO_BASE, 0, 0,
@@ -420,7 +531,6 @@ int board_mmc_init(bd_t *bis)
 }
 #endif
 
-#ifdef CONFIG_SCSI_AHCI_PLAT
 #define AHCI_VENDOR_SPECIFIC_0_ADDR	0xa0
 #define AHCI_VENDOR_SPECIFIC_0_DATA	0xa4
 
@@ -432,6 +542,10 @@ static void ahci_mvebu_mbus_config(void __iomem *base)
 {
 	const struct mbus_dram_target_info *dram;
 	int i;
+
+	/* mbus is not initialized in SPL; keep the ROM settings */
+	if (IS_ENABLED(CONFIG_SPL_BUILD))
+		return;
 
 	dram = mvebu_mbus_dram_info();
 
@@ -464,12 +578,61 @@ static void ahci_mvebu_regret_option(void __iomem *base)
 	writel(0x80, base + AHCI_VENDOR_SPECIFIC_0_DATA);
 }
 
+int board_ahci_enable(void)
+{
+	ahci_mvebu_mbus_config((void __iomem *)MVEBU_SATA0_BASE);
+	ahci_mvebu_regret_option((void __iomem *)MVEBU_SATA0_BASE);
+
+	return 0;
+}
+
+#ifdef CONFIG_SCSI_AHCI_PLAT
 void scsi_init(void)
 {
 	printf("MVEBU SATA INIT\n");
-	ahci_mvebu_mbus_config((void __iomem *)MVEBU_SATA0_BASE);
-	ahci_mvebu_regret_option((void __iomem *)MVEBU_SATA0_BASE);
+	board_ahci_enable();
 	ahci_init((void __iomem *)MVEBU_SATA0_BASE);
+}
+#endif
+
+#ifdef CONFIG_USB_XHCI_MVEBU
+#define USB3_MAX_WINDOWS        4
+#define USB3_WIN_CTRL(w)        (0x0 + ((w) * 8))
+#define USB3_WIN_BASE(w)        (0x4 + ((w) * 8))
+
+static void xhci_mvebu_mbus_config(void __iomem *base,
+			const struct mbus_dram_target_info *dram)
+{
+	int i;
+
+	for (i = 0; i < USB3_MAX_WINDOWS; i++) {
+		writel(0, base + USB3_WIN_CTRL(i));
+		writel(0, base + USB3_WIN_BASE(i));
+	}
+
+	for (i = 0; i < dram->num_cs; i++) {
+		const struct mbus_dram_window *cs = dram->cs + i;
+
+		/* Write size, attributes and target id to control register */
+		writel(((cs->size - 1) & 0xffff0000) | (cs->mbus_attr << 8) |
+			(dram->mbus_dram_target_id << 4) | 1,
+			base + USB3_WIN_CTRL(i));
+
+		/* Write base address to base register */
+		writel((cs->base & 0xffff0000), base + USB3_WIN_BASE(i));
+	}
+}
+
+int board_xhci_enable(fdt_addr_t base)
+{
+	const struct mbus_dram_target_info *dram;
+
+	printf("MVEBU XHCI INIT controller @ 0x%lx\n", base);
+
+	dram = mvebu_mbus_dram_info();
+	xhci_mvebu_mbus_config((void __iomem *)base, dram);
+
+	return 0;
 }
 #endif
 
@@ -478,8 +641,15 @@ void enable_caches(void)
 	/* Avoid problem with e.g. neta ethernet driver */
 	invalidate_dcache_all();
 
-	/* Enable D-cache. I-cache is already enabled in start.S */
-	dcache_enable();
+	/*
+	 * Armada 375 still has some problems with d-cache enabled in the
+	 * ethernet driver (mvpp2). So lets keep the d-cache disabled
+	 * until this is solved.
+	 */
+	if (mvebu_soc_family() != MVEBU_SOC_A375) {
+		/* Enable D-cache. I-cache is already enabled in start.S */
+		dcache_enable();
+	}
 }
 
 void v7_outer_cache_enable(void)

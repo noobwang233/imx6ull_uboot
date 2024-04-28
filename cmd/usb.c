@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2001
  * Denis Peter, MPL AG Switzerland
@@ -7,14 +8,13 @@
  *
  * Most of this source has been derived from the Linux USB
  * project.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <command.h>
 #include <console.h>
 #include <dm.h>
+#include <dm/uclass-internal.h>
 #include <memalign.h>
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
@@ -149,6 +149,8 @@ static void usb_display_string(struct usb_device *dev, int index)
 
 static void usb_display_desc(struct usb_device *dev)
 {
+	uint packet_size = dev->descriptor.bMaxPacketSize0;
+
 	if (dev->descriptor.bDescriptorType == USB_DT_DEVICE) {
 		printf("%d: %s,  USB Revision %x.%x\n", dev->devnum,
 		usb_get_class_desc(dev->config.if_desc[0].desc.bInterfaceClass),
@@ -170,9 +172,10 @@ static void usb_display_desc(struct usb_device *dev)
 			       usb_get_class_desc(
 				dev->config.if_desc[0].desc.bInterfaceClass));
 		}
+		if (dev->descriptor.bcdUSB >= cpu_to_le16(0x0300))
+			packet_size = 1 << packet_size;
 		printf(" - PacketSize: %d  Configurations: %d\n",
-			dev->descriptor.bMaxPacketSize0,
-			dev->descriptor.bNumConfigurations);
+			packet_size, dev->descriptor.bNumConfigurations);
 		printf(" - Vendor: 0x%04x  Product 0x%04x Version %d.%d\n",
 			dev->descriptor.idVendor, dev->descriptor.idProduct,
 			(dev->descriptor.bcdDevice>>8) & 0xff,
@@ -313,26 +316,18 @@ static struct usb_device *usb_find_device(int devnum)
 	return NULL;
 }
 
-static inline char *portspeed(int speed)
+static inline const char *portspeed(int speed)
 {
-	char *speed_str;
-
 	switch (speed) {
 	case USB_SPEED_SUPER:
-		speed_str = "5 Gb/s";
-		break;
+		return "5 Gb/s";
 	case USB_SPEED_HIGH:
-		speed_str = "480 Mb/s";
-		break;
+		return "480 Mb/s";
 	case USB_SPEED_LOW:
-		speed_str = "1.5 Mb/s";
-		break;
+		return "1.5 Mb/s";
 	default:
-		speed_str = "12 Mb/s";
-		break;
+		return "12 Mb/s";
 	}
-
-	return speed_str;
 }
 
 /* shows the device tree recursively */
@@ -345,6 +340,16 @@ static void usb_show_tree_graph(struct usb_device *dev, char *pre)
 	printf(" %s", pre);
 #ifdef CONFIG_DM_USB
 	has_child = device_has_active_children(dev->dev);
+	if (device_get_uclass_id(dev->dev) == UCLASS_MASS_STORAGE) {
+		struct udevice *child;
+
+		for (device_find_first_child(dev->dev, &child);
+		     child;
+		     device_find_next_child(&child)) {
+			if (device_get_uclass_id(child) == UCLASS_BLK)
+				has_child = 0;
+		}
+	}
 #else
 	/* check if the device has connected children */
 	int i;
@@ -410,8 +415,12 @@ static void usb_show_tree_graph(struct usb_device *dev, char *pre)
 
 		udev = dev_get_parent_priv(child);
 
-		/* Ignore emulators, we only want real devices */
-		if (device_get_uclass_id(child) != UCLASS_USB_EMUL) {
+		/*
+		 * Ignore emulators and block child devices, we only want
+		 * real devices
+		 */
+		if ((device_get_uclass_id(child) != UCLASS_USB_EMUL) &&
+		    (device_get_uclass_id(child) != UCLASS_BLK)) {
 			usb_show_tree_graph(udev, pre);
 			pre[index] = 0;
 		}
@@ -437,23 +446,35 @@ static void usb_show_subtree(struct usb_device *dev)
 	usb_show_tree_graph(dev, &preamble[0]);
 }
 
-void usb_show_tree(void)
-{
 #ifdef CONFIG_DM_USB
+typedef void (*usb_dev_func_t)(struct usb_device *udev);
+
+static void usb_for_each_root_dev(usb_dev_func_t func)
+{
 	struct udevice *bus;
 
-	for (uclass_first_device(UCLASS_USB, &bus);
+	for (uclass_find_first_device(UCLASS_USB, &bus);
 		bus;
-		uclass_next_device(&bus)) {
+		uclass_find_next_device(&bus)) {
 		struct usb_device *udev;
 		struct udevice *dev;
+
+		if (!device_active(bus))
+			continue;
 
 		device_find_first_child(bus, &dev);
 		if (dev && device_active(dev)) {
 			udev = dev_get_parent_priv(dev);
-			usb_show_subtree(udev);
+			func(udev);
 		}
 	}
+}
+#endif
+
+void usb_show_tree(void)
+{
+#ifdef CONFIG_DM_USB
+	usb_for_each_root_dev(usb_show_subtree);
 #else
 	struct usb_device *udev;
 	int i;
@@ -541,7 +562,7 @@ static int do_usbboot(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 static int do_usb_stop_keyboard(int force)
 {
-#ifdef CONFIG_USB_KEYBOARD
+#if !defined CONFIG_DM_USB && defined CONFIG_USB_KEYBOARD
 	if (usb_kbd_deregister(force) != 0) {
 		printf("USB not stopped: usbkbd still using USB\n");
 		return 1;
@@ -558,11 +579,11 @@ static void do_usb_start(void)
 		return;
 
 	/* Driver model will probe the devices as they are found */
-#ifndef CONFIG_DM_USB
 # ifdef CONFIG_USB_STORAGE
 	/* try to recognize storage devices immediately */
 	usb_stor_curr_dev = usb_stor_scan(1);
 # endif
+#ifndef CONFIG_DM_USB
 # ifdef CONFIG_USB_KEYBOARD
 	drv_usb_kbd_init();
 # endif
@@ -580,39 +601,22 @@ static void do_usb_start(void)
 }
 
 #ifdef CONFIG_DM_USB
-static void show_info(struct udevice *dev)
+static void usb_show_info(struct usb_device *udev)
 {
 	struct udevice *child;
-	struct usb_device *udev;
 
-	udev = dev_get_parent_priv(dev);
 	usb_display_desc(udev);
 	usb_display_config(udev);
-	for (device_find_first_child(dev, &child);
+	for (device_find_first_child(udev->dev, &child);
 	     child;
 	     device_find_next_child(&child)) {
-		if (device_active(child))
-			show_info(child);
-	}
-}
-
-static int usb_device_info(void)
-{
-	struct udevice *bus;
-
-	for (uclass_first_device(UCLASS_USB, &bus);
-	     bus;
-	     uclass_next_device(&bus)) {
-		struct udevice *hub;
-
-		device_find_first_child(bus, &hub);
-		if (device_get_uclass_id(hub) == UCLASS_USB_HUB &&
-		    device_active(hub)) {
-			show_info(hub);
+		if (device_active(child) &&
+		    (device_get_uclass_id(child) != UCLASS_USB_EMUL) &&
+		    (device_get_uclass_id(child) != UCLASS_BLK)) {
+			udev = dev_get_parent_priv(child);
+			usb_show_info(udev);
 		}
 	}
-
-	return 0;
 }
 #endif
 
@@ -624,9 +628,6 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	struct usb_device *udev = NULL;
 	int i;
 	extern char usb_started;
-#ifdef CONFIG_USB_STORAGE
-	block_dev_desc_t *stor_dev;
-#endif
 
 	if (argc < 2)
 		return CMD_RET_USAGE;
@@ -668,7 +669,7 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if (strncmp(argv[1], "inf", 3) == 0) {
 		if (argc == 2) {
 #ifdef CONFIG_DM_USB
-			usb_device_info();
+			usb_for_each_root_dev(usb_show_info);
 #else
 			int d;
 			for (d = 0; d < USB_MAX_DEVICE; d++) {
@@ -715,109 +716,10 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if (strncmp(argv[1], "stor", 4) == 0)
 		return usb_stor_info();
 
-	if (strncmp(argv[1], "part", 4) == 0) {
-		int devno, ok = 0;
-		if (argc == 2) {
-			for (devno = 0; ; ++devno) {
-				stor_dev = usb_stor_get_dev(devno);
-				if (stor_dev == NULL)
-					break;
-				if (stor_dev->type != DEV_TYPE_UNKNOWN) {
-					ok++;
-					if (devno)
-						printf("\n");
-					debug("print_part of %x\n", devno);
-					print_part(stor_dev);
-				}
-			}
-		} else {
-			devno = simple_strtoul(argv[2], NULL, 16);
-			stor_dev = usb_stor_get_dev(devno);
-			if (stor_dev != NULL &&
-			    stor_dev->type != DEV_TYPE_UNKNOWN) {
-				ok++;
-				debug("print_part of %x\n", devno);
-				print_part(stor_dev);
-			}
-		}
-		if (!ok) {
-			printf("\nno USB devices available\n");
-			return 1;
-		}
-		return 0;
-	}
-	if (strcmp(argv[1], "read") == 0) {
-		if (usb_stor_curr_dev < 0) {
-			printf("no current device selected\n");
-			return 1;
-		}
-		if (argc == 5) {
-			unsigned long addr = simple_strtoul(argv[2], NULL, 16);
-			unsigned long blk  = simple_strtoul(argv[3], NULL, 16);
-			unsigned long cnt  = simple_strtoul(argv[4], NULL, 16);
-			unsigned long n;
-			printf("\nUSB read: device %d block # %ld, count %ld"
-				" ... ", usb_stor_curr_dev, blk, cnt);
-			stor_dev = usb_stor_get_dev(usb_stor_curr_dev);
-			n = stor_dev->block_read(stor_dev, blk, cnt,
-						 (ulong *)addr);
-			printf("%ld blocks read: %s\n", n,
-				(n == cnt) ? "OK" : "ERROR");
-			if (n == cnt)
-				return 0;
-			return 1;
-		}
-	}
-	if (strcmp(argv[1], "write") == 0) {
-		if (usb_stor_curr_dev < 0) {
-			printf("no current device selected\n");
-			return 1;
-		}
-		if (argc == 5) {
-			unsigned long addr = simple_strtoul(argv[2], NULL, 16);
-			unsigned long blk  = simple_strtoul(argv[3], NULL, 16);
-			unsigned long cnt  = simple_strtoul(argv[4], NULL, 16);
-			unsigned long n;
-			printf("\nUSB write: device %d block # %ld, count %ld"
-				" ... ", usb_stor_curr_dev, blk, cnt);
-			stor_dev = usb_stor_get_dev(usb_stor_curr_dev);
-			n = stor_dev->block_write(stor_dev, blk, cnt,
-						(ulong *)addr);
-			printf("%ld blocks write: %s\n", n,
-				(n == cnt) ? "OK" : "ERROR");
-			if (n == cnt)
-				return 0;
-			return 1;
-		}
-	}
-	if (strncmp(argv[1], "dev", 3) == 0) {
-		if (argc == 3) {
-			int dev = (int)simple_strtoul(argv[2], NULL, 10);
-			printf("\nUSB device %d: ", dev);
-			stor_dev = usb_stor_get_dev(dev);
-			if (stor_dev == NULL) {
-				printf("unknown device\n");
-				return 1;
-			}
-			printf("\n    Device %d: ", dev);
-			dev_print(stor_dev);
-			if (stor_dev->type == DEV_TYPE_UNKNOWN)
-				return 1;
-			usb_stor_curr_dev = dev;
-			printf("... is now current device\n");
-			return 0;
-		} else {
-			printf("\nUSB device %d: ", usb_stor_curr_dev);
-			stor_dev = usb_stor_get_dev(usb_stor_curr_dev);
-			dev_print(stor_dev);
-			if (stor_dev->type == DEV_TYPE_UNKNOWN)
-				return 1;
-			return 0;
-		}
-		return 0;
-	}
-#endif /* CONFIG_USB_STORAGE */
+	return blk_common_cmd(argc, argv, IF_TYPE_USB, &usb_stor_curr_dev);
+#else
 	return CMD_RET_USAGE;
+#endif /* CONFIG_USB_STORAGE */
 }
 
 U_BOOT_CMD(

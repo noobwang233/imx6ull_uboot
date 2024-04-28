@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2003
  * Tait Electronics Limited, Christchurch, New Zealand
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -15,6 +14,7 @@
 #include <common.h>
 #include <config.h>
 #include <command.h>
+#include <env.h>
 #include <mapmem.h>
 
 #include <asm/io.h>
@@ -65,14 +65,19 @@ static long evalexp(char *s, int w)
 		}
 		switch (w) {
 		case 1:
-			l = (long)(*(unsigned char *)buf);
+			l = (long)(*(u8 *)buf);
 			break;
 		case 2:
-			l = (long)(*(unsigned short *)buf);
+			l = (long)(*(u16 *)buf);
 			break;
 		case 4:
+			l = (long)(*(u32 *)buf);
+			break;
+#ifdef CONFIG_PHYS_64BIT
+		case 8:
 			l = (long)(*(unsigned long *)buf);
 			break;
+#endif
 		}
 		unmap_physmem(buf, w);
 		return l;
@@ -80,7 +85,8 @@ static long evalexp(char *s, int w)
 		l = simple_strtoul(s, NULL, 16);
 	}
 
-	return l & ((1UL << (w * 8)) - 1);
+	/* avoid overflow on mask calculus */
+	return (w >= sizeof(long)) ? l : (l & ((1UL << (w * 8)) - 1));
 }
 
 static char * evalstr(char *s)
@@ -100,7 +106,7 @@ static char * evalstr(char *s)
 			i++;
 		}
 		s[i] = 0;
-		return  getenv((const char *)&s[2]);
+		return  env_get((const char *)&s[2]);
 	} else {
 		return s;
 	}
@@ -185,6 +191,9 @@ static int do_itest(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	case 1:
 	case 2:
 	case 4:
+#ifdef CONFIG_PHYS_64BIT
+	case 8:
+#endif
 		value = binary_test (argv[2], argv[1], argv[3], w);
 		break;
 	case -2:
@@ -203,5 +212,9 @@ static int do_itest(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 U_BOOT_CMD(
 	itest, 4, 0, do_itest,
 	"return true/false on integer compare",
+#ifdef CONFIG_PHYS_64BIT
+	"[.b, .w, .l, .q, .s] [*]value1 <op> [*]value2"
+#else
 	"[.b, .w, .l, .s] [*]value1 <op> [*]value2"
+#endif
 );

@@ -1,16 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Common LCD routines
  *
  * (C) Copyright 2001-2002
  * Wolfgang Denk, DENX Software Engineering -- wd@denx.de
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* #define DEBUG */
 #include <config.h>
 #include <common.h>
 #include <command.h>
+#include <cpu_func.h>
 #include <env_callback.h>
 #include <linux/types.h>
 #include <stdio_dev.h>
@@ -57,12 +57,12 @@ void lcd_sync(void)
 	 * architectures do not actually implement it. Is there a way to find
 	 * out whether it exists? For now, ARM is safe.
 	 */
-#if defined(CONFIG_ARM) && !defined(CONFIG_SYS_DCACHE_OFF)
+#if defined(CONFIG_ARM) && !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
 	int line_length;
 
 	if (lcd_flush_dcache)
-		flush_dcache_range((u32)lcd_base,
-			(u32)(lcd_base + lcd_get_size(&line_length)));
+		flush_dcache_range((ulong)lcd_base,
+			(ulong)(lcd_base + lcd_get_size(&line_length)));
 #endif
 }
 
@@ -166,8 +166,7 @@ int drv_lcd_init(void)
 
 void lcd_clear(void)
 {
-	char *s;
-	ulong addr;
+	__maybe_unused ulong addr;
 	static int do_splash = 1;
 #if LCD_BPP == LCD_MONOCHROME
 	/* Setting the palette */
@@ -220,14 +219,10 @@ void lcd_clear(void)
 	/* Paint the logo and retrieve LCD base address */
 	debug("[LCD] Drawing the logo...\n");
 	if (do_splash) {
-		s = getenv("splashimage");
-		if (s) {
+		if (splash_display() == 0) {
 			do_splash = 0;
-			addr = simple_strtoul(s, NULL, 16);
-			if (lcd_splash(addr) == 0) {
-				lcd_sync();
-				return;
-			}
+			lcd_sync();
+			return;
 		}
 	}
 
@@ -239,14 +234,6 @@ void lcd_clear(void)
 #endif
 	lcd_sync();
 }
-
-static int do_lcd_clear(cmd_tbl_t *cmdtp, int flag, int argc,
-			char *const argv[])
-{
-	lcd_clear();
-	return 0;
-}
-U_BOOT_CMD(cls,	1, 1, do_lcd_clear, "clear screen", "");
 
 static int lcd_init(void *lcdbase)
 {
@@ -387,7 +374,6 @@ static inline void lcd_logo_plot(int x, int y) {}
 
 #if defined(CONFIG_CMD_BMP) || defined(CONFIG_SPLASH_SCREEN)
 #ifdef CONFIG_SPLASH_SCREEN_ALIGN
-#define BMP_ALIGN_CENTER	0x7FFF
 
 static void splash_align_axis(int *axis, unsigned long panel_size,
 					unsigned long picture_size)
@@ -559,11 +545,7 @@ __weak void lcd_set_cmap(struct bmp_image *bmp, unsigned colors)
 		*cmap = (((cte.red)   << 8) & 0xf800) |
 			(((cte.green) << 3) & 0x07e0) |
 			(((cte.blue)  >> 3) & 0x001f);
-#if defined(CONFIG_MPC823)
-		cmap--;
-#else
 		cmap++;
-#endif
 	}
 }
 
@@ -579,7 +561,7 @@ int lcd_display_bitmap(ulong bmp_image, int x, int y)
 	unsigned long pwidth = panel_info.vl_col;
 	unsigned colors, bpix, bmp_bpix;
 	int hdr_size;
-	struct bmp_color_table_entry *palette = bmp->color_table;
+	struct bmp_color_table_entry *palette;
 
 	if (!bmp || !(bmp->header.signature[0] == 'B' &&
 		bmp->header.signature[1] == 'M')) {
@@ -588,6 +570,7 @@ int lcd_display_bitmap(ulong bmp_image, int x, int y)
 		return 1;
 	}
 
+	palette = bmp->color_table;
 	width = get_unaligned_le32(&bmp->header.width);
 	height = get_unaligned_le32(&bmp->header.height);
 	bmp_bpix = get_unaligned_le16(&bmp->header.bit_count);
@@ -701,7 +684,7 @@ int lcd_display_bitmap(ulong bmp_image, int x, int y)
 		}
 		break;
 #endif /* CONFIG_BMP_16BPP */
-#if defined(CONFIG_BMP_24BMP)
+#if defined(CONFIG_BMP_24BPP)
 	case 24:
 		for (i = 0; i < height; ++i) {
 			for (j = 0; j < width; j++) {
@@ -713,7 +696,7 @@ int lcd_display_bitmap(ulong bmp_image, int x, int y)
 			fb -= lcd_line_length + width * (bpix / 8);
 		}
 		break;
-#endif /* CONFIG_BMP_24BMP */
+#endif /* CONFIG_BMP_24BPP */
 #if defined(CONFIG_BMP_32BPP)
 	case 32:
 		for (i = 0; i < height; ++i) {

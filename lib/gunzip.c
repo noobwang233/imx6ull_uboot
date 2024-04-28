@@ -1,18 +1,20 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000-2006
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <watchdog.h>
 #include <command.h>
 #include <console.h>
+#include <div64.h>
+#include <gzip.h>
 #include <image.h>
 #include <malloc.h>
+#include <memalign.h>
+#include <u-boot/crc.h>
+#include <watchdog.h>
 #include <u-boot/zlib.h>
-#include <div64.h>
 
 #define HEADER0			'\x1f'
 #define HEADER1			'\x8b'
@@ -41,7 +43,7 @@ void gzfree(void *x, void *addr, unsigned nb)
 	free (addr);
 }
 
-int gunzip(void *dst, int dstlen, unsigned char *src, unsigned long *lenp)
+int gzip_parse_header(const unsigned char *src, unsigned long len)
 {
 	int i, flags;
 
@@ -62,12 +64,21 @@ int gunzip(void *dst, int dstlen, unsigned char *src, unsigned long *lenp)
 			;
 	if ((flags & HEAD_CRC) != 0)
 		i += 2;
-	if (i >= *lenp) {
+	if (i >= len) {
 		puts ("Error: gunzip out of data in header\n");
 		return (-1);
 	}
+	return i;
+}
 
-	return zunzip(dst, dstlen, src, lenp, 1, i);
+int gunzip(void *dst, int dstlen, unsigned char *src, unsigned long *lenp)
+{
+	int offset = gzip_parse_header(src, *lenp);
+
+	if (offset < 0)
+		return offset;
+
+	return zunzip(dst, dstlen, src, lenp, 1, offset);
 }
 
 #ifdef CONFIG_CMD_UNZIP
@@ -105,7 +116,7 @@ void gzwrite_progress_finish(int returnval,
 }
 
 int gzwrite(unsigned char *src, int len,
-	    struct block_dev_desc *dev,
+	    struct blk_desc *dev,
 	    unsigned long szwritebuf,
 	    u64 startoffs,
 	    u64 szexpected)
@@ -193,7 +204,7 @@ int gzwrite(unsigned char *src, int len,
 
 	s.next_in = src + i;
 	s.avail_in = payload_size+8;
-	writebuf = (unsigned char *)malloc(szwritebuf);
+	writebuf = (unsigned char *)malloc_cache_aligned(szwritebuf);
 
 	/* decompress until deflate stream ends or end of file */
 	do {
@@ -232,9 +243,8 @@ int gzwrite(unsigned char *src, int len,
 			gzwrite_progress(iteration++,
 					 totalfilled,
 					 szexpected);
-			blocks_written = dev->block_write(dev, outblock,
-							  writeblocks,
-							  writebuf);
+			blocks_written = blk_dwrite(dev, outblock,
+						    writeblocks, writebuf);
 			outblock += blocks_written;
 			if (ctrlc()) {
 				puts("abort\n");

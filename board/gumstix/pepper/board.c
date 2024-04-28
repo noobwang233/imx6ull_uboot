@@ -1,14 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Board functions for Gumstix Pepper and AM335x-based boards
  *
  * Copyright (C) 2014, Gumstix, Incorporated - http://www.gumstix.com/
  * Based on board/ti/am335x/board.c from Texas Instruments, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <env.h>
 #include <errno.h>
+#include <serial.h>
 #include <spl.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
@@ -26,7 +27,6 @@
 #include <miiphy.h>
 #include <cpsw.h>
 #include <power/tps65217.h>
-#include <environment.h>
 #include <watchdog.h>
 #include "board.h"
 
@@ -239,7 +239,7 @@ int board_eth_init(bd_t *bis)
 	uint32_t mac_hi, mac_lo;
 	const char *devname;
 
-	if (!eth_getenv_enetaddr("ethaddr", mac_addr)) {
+	if (!eth_env_get_enetaddr("ethaddr", mac_addr)) {
 		/* try reading mac address from efuse */
 		mac_lo = readl(&cdev->macid0l);
 		mac_hi = readl(&cdev->macid0h);
@@ -250,7 +250,7 @@ int board_eth_init(bd_t *bis)
 		mac_addr[4] = mac_lo & 0xFF;
 		mac_addr[5] = (mac_lo & 0xFF00) >> 8;
 		if (is_valid_ethaddr(mac_addr))
-			eth_setenv_enetaddr("ethaddr", mac_addr);
+			eth_env_set_enetaddr("ethaddr", mac_addr);
 	}
 
 	writel((RGMII_MODE_ENABLE | RGMII_INT_DELAY), &cdev->miisel);

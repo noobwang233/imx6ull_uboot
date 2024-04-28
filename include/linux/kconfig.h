@@ -51,17 +51,31 @@
 #define _IS_SPL 1
 #endif
 
+#ifdef CONFIG_TPL_BUILD
+#define _IS_TPL 1
+#endif
+
+#if defined(CONFIG_TPL_BUILD)
+#define config_val(cfg) _config_val(_IS_TPL, cfg)
+#define _config_val(x, cfg) __config_val(x, cfg)
+#define __config_val(x, cfg) ___config_val(__ARG_PLACEHOLDER_##x, cfg)
+#define ___config_val(arg1_or_junk, cfg)  \
+	____config_val(arg1_or_junk CONFIG_TPL_##cfg, CONFIG_##cfg)
+#define ____config_val(__ignored, val, ...) val
+#else
 #define config_val(cfg) _config_val(_IS_SPL, cfg)
 #define _config_val(x, cfg) __config_val(x, cfg)
 #define __config_val(x, cfg) ___config_val(__ARG_PLACEHOLDER_##x, cfg)
 #define ___config_val(arg1_or_junk, cfg)  \
 	____config_val(arg1_or_junk CONFIG_SPL_##cfg, CONFIG_##cfg)
 #define ____config_val(__ignored, val, ...) val
+#endif
 
 /*
  * CONFIG_VAL(FOO) evaluates to the value of
  *  CONFIG_FOO if CONFIG_SPL_BUILD is undefined,
  *  CONFIG_SPL_FOO if CONFIG_SPL_BUILD is defined.
+ *  CONFIG_TPL_FOO if CONFIG_TPL_BUILD is defined.
  */
 #define CONFIG_VAL(option)  config_val(option)
 
@@ -69,6 +83,7 @@
  * CONFIG_IS_ENABLED(FOO) evaluates to
  *  1 if CONFIG_SPL_BUILD is undefined and CONFIG_FOO is set to 'y' or 'm',
  *  1 if CONFIG_SPL_BUILD is defined and CONFIG_SPL_FOO is set to 'y' or 'm',
+ *  1 if CONFIG_TPL_BUILD is defined and CONFIG_TPL_FOO is set to 'y' or 'm',
  *  0 otherwise.
  */
 #define CONFIG_IS_ENABLED(option) \

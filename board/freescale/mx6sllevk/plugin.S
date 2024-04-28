@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2016 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
@@ -92,6 +91,8 @@
 	str r1, [r0, #0x040]
 	ldr r1, =0xC4190000
 	str r1, [r0, #0x000]
+	ldr r1, =0x20000000
+	str r1, [r0, #0x83C]
 
 	ldr r1, =0x00008050
 	str r1, [r0, #0x01C]
@@ -117,9 +118,6 @@
 	str r1, [r0, #0x01C]
 	ldr r1, =0x01038038
 	str r1, [r0, #0x01C]
-
-	ldr r1, =0x20000000
-	str r1, [r0, #0x83C]
 
 	ldr r1, =0x00001800
 	str r1, [r0, #0x020]

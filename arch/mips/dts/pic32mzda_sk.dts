@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015 Purna Chandra Mandal, purna.mandal@microchip.com
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /dts-v1/;
@@ -52,4 +51,8 @@
 	ethernet_phy: lan8740_phy@0 {
 		reg = <0>;
 	};
+};
+
+&usb {
+	status = "okay";
 };

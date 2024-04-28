@@ -1,18 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015, Bin Meng <bmeng.cn@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <asm/io.h>
 #include <asm/arch/device.h>
 #include <asm/arch/quark.h>
-
-int board_early_init_f(void)
-{
-	return 0;
-}
 
 /*
  * Intel Galileo gen2 board uses GPIO Resume Well bank pin0 as the PERST# pin.
@@ -64,9 +58,4 @@ void board_deassert_perst(void)
 	val = inl(port);
 	val |= (1 << 0);
 	outl(val, port);
-}
-
-void setup_pch_gpios(u16 gpiobase, const struct pch_gpio_map *gpio)
-{
-	return;
 }

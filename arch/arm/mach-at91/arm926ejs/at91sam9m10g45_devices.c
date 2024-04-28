@@ -1,12 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2007-2008
  * Stelian Pop <stelian@popies.net>
  * Lead Tech Design <www.leadtechdesign.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <dm.h>
 #include <asm/arch/at91_common.h>
 #include <asm/arch/clk.h>
 #include <asm/arch/gpio.h>
@@ -55,7 +55,7 @@ void at91_seriald_hw_init(void)
 	at91_periph_clk_enable(ATMEL_ID_SYS);
 }
 
-#if defined(CONFIG_HAS_DATAFLASH) || defined(CONFIG_ATMEL_SPI)
+#ifdef CONFIG_ATMEL_SPI
 void at91_spi0_hw_init(unsigned long cs_mask)
 {
 	at91_set_a_periph(AT91_PIO_PORTB, 0, PUP);	/* SPI0_MISO */
@@ -165,3 +165,20 @@ void at91_mci_hw_init(void)
 	at91_periph_clk_enable(ATMEL_ID_MCI0);
 }
 #endif
+
+/* Platform data for the GPIOs */
+static const struct at91_port_platdata at91sam9260_plat[] = {
+	{ ATMEL_BASE_PIOA, "PA" },
+	{ ATMEL_BASE_PIOB, "PB" },
+	{ ATMEL_BASE_PIOC, "PC" },
+	{ ATMEL_BASE_PIOD, "PD" },
+	{ ATMEL_BASE_PIOE, "PE" },
+};
+
+U_BOOT_DEVICES(at91sam9260_gpios) = {
+	{ "gpio_at91", &at91sam9260_plat[0] },
+	{ "gpio_at91", &at91sam9260_plat[1] },
+	{ "gpio_at91", &at91sam9260_plat[2] },
+	{ "gpio_at91", &at91sam9260_plat[3] },
+	{ "gpio_at91", &at91sam9260_plat[4] },
+};

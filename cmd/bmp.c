@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2002
  * Detlev Zundel, DENX Software Engineering, dzu@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -10,16 +9,18 @@
  */
 
 #include <common.h>
-#include <dm.h>
-#include <lcd.h>
-#include <mapmem.h>
 #include <bmp_layout.h>
 #include <command.h>
-#include <asm/byteorder.h>
+#include <dm.h>
+#include <gzip.h>
+#include <image.h>
+#include <lcd.h>
 #include <malloc.h>
 #include <mapmem.h>
 #include <splash.h>
 #include <video.h>
+#include <video_link.h>
+#include <asm/byteorder.h>
 
 static int bmp_info (ulong addr);
 
@@ -58,7 +59,7 @@ struct bmp_image *gunzip_bmp(unsigned long addr, unsigned long *lenp,
 	bmp = dst;
 
 	/* align to 32-bit-aligned-address + 2 */
-	bmp = (struct bmp_image *)((((unsigned int)dst + 1) & ~3) + 2);
+	bmp = (struct bmp_image *)((((uintptr_t)dst + 1) & ~3) + 2);
 
 	if (gunzip(bmp, CONFIG_SYS_VIDEO_LOGO_MAX_SIZE, map_sysmem(addr, 0),
 		   &len) != 0) {
@@ -96,8 +97,8 @@ static int do_bmp_info(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[
 	ulong addr;
 
 	switch (argc) {
-	case 1:		/* use load_addr as default address */
-		addr = load_addr;
+	case 1:		/* use image_load_addr as default address */
+		addr = image_load_addr;
 		break;
 	case 2:		/* use argument */
 		addr = simple_strtoul(argv[1], NULL, 16);
@@ -117,16 +118,22 @@ static int do_bmp_display(cmd_tbl_t * cmdtp, int flag, int argc, char * const ar
 	splash_get_pos(&x, &y);
 
 	switch (argc) {
-	case 1:		/* use load_addr as default address */
-		addr = load_addr;
+	case 1:		/* use image_load_addr as default address */
+		addr = image_load_addr;
 		break;
 	case 2:		/* use argument */
 		addr = simple_strtoul(argv[1], NULL, 16);
 		break;
 	case 4:
 		addr = simple_strtoul(argv[1], NULL, 16);
-		x = simple_strtoul(argv[2], NULL, 10);
-		y = simple_strtoul(argv[3], NULL, 10);
+		if (!strcmp(argv[2], "m"))
+			x = BMP_ALIGN_CENTER;
+		else
+			x = simple_strtoul(argv[2], NULL, 10);
+		if (!strcmp(argv[3], "m"))
+			y = BMP_ALIGN_CENTER;
+		else
+			y = simple_strtoul(argv[3], NULL, 10);
 		break;
 	default:
 		return CMD_RET_USAGE;
@@ -246,18 +253,23 @@ int bmp_display(ulong addr, int x, int y)
 	addr = map_to_sysmem(bmp);
 
 #ifdef CONFIG_DM_VIDEO
-	ret = uclass_first_device(UCLASS_VIDEO, &dev);
+#ifdef CONFIG_VIDEO_LINK
+	dev = video_link_get_video_device();
+	if (!dev) {
+		ret = -ENODEV;
+	} else {
+#else
+	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
 	if (!ret) {
-		if (!dev)
-			ret = -ENODEV;
-		if (!ret) {
-			bool align = false;
+#endif
+		bool align = false;
 
-# ifdef CONFIG_SPLASH_SCREEN_ALIGN
+		if (CONFIG_IS_ENABLED(SPLASH_SCREEN_ALIGN) ||
+		    x == BMP_ALIGN_CENTER ||
+		    y == BMP_ALIGN_CENTER)
 			align = true;
-# endif /* CONFIG_SPLASH_SCREEN_ALIGN */
-			ret = video_bmp_display(dev, addr, x, y, align);
-		}
+
+		ret = video_bmp_display(dev, addr, x, y, align);
 	}
 #elif defined(CONFIG_LCD)
 	ret = lcd_display_bitmap(addr, x, y);

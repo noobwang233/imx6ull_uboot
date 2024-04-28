@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012-2016 Freescale Semiconductor, Inc.
+ * Copyright 2017 NXP
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
@@ -635,7 +636,7 @@
 	str r1, [r0, #0x068]
 	ldr r1, =0x0030FC03
 	str r1, [r0, #0x06c]
-	ldr r1, =0x0FFFC000
+	ldr r1, =0x0FFFF000
 	str r1, [r0, #0x070]
 	ldr r1, =0x3FF00000
 	str r1, [r0, #0x074]
@@ -645,6 +646,13 @@
 	str r1, [r0, #0x07c]
 	ldr r1, =0x000003FF
 	str r1, [r0, #0x080]
+#ifdef CONFIG_IMX_OPTEE
+#ifndef CONFIG_MX6QP
+	ldr r0, =0x20e0024
+	ldr r1, =0x3
+	str r1, [r0]
+#endif
+#endif
 .endm
 
 .macro imx6_qos_setting
@@ -664,7 +672,7 @@
 .endm
 
 .macro imx6_ddr_setting
-#if defined (CONFIG_MX6SOLO)
+#if defined (CONFIG_MX6S)
 	imx6solosabresd_ddr_setting
 #elif defined (CONFIG_MX6DL)
 	imx6dlsabresd_ddr_setting

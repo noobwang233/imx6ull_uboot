@@ -1,17 +1,18 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2013 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <init.h>
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/cache.h>
 #include <asm/immap_85xx.h>
 #include <asm/io.h>
+#include <env.h>
 #include <miiphy.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <fdt_support.h>
 #include <fsl_mdio.h>
 #include <tsec.h>
@@ -122,7 +123,7 @@ void fdt_del_sec(void *blob, int offset)
 
 	while ((nodeoff = fdt_node_offset_by_compat_reg(blob, "fsl,sec-v6.0",
 			CONFIG_SYS_CCSRBAR_PHYS + CONFIG_SYS_FSL_SEC_OFFSET
-			+ offset * 0x20000)) >= 0) {
+			+ offset * CONFIG_SYS_FSL_SEC_IDX_OFFSET)) >= 0) {
 		fdt_del_node(blob, nodeoff);
 		offset++;
 	}
@@ -138,8 +139,8 @@ int ft_board_setup(void *blob, bd_t *bd)
 
 	ft_cpu_setup(blob, bd);
 
-	base = getenv_bootm_low();
-	size = getenv_bootm_size();
+	base = env_get_bootm_low();
+	size = env_get_bootm_size();
 
 #if defined(CONFIG_PCI)
 	FT_FSL_PCI_SETUP;

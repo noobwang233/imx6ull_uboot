@@ -1,11 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2012 Oleksandr Tymoshenko <gonzo@freebsd.org>
  * Copyright (C) 2014 Marek Vasut <marex@denx.de>
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <dm.h>
 #include <errno.h>
 #include <usb.h>
@@ -15,6 +15,9 @@
 #include <usbroothubdes.h>
 #include <wait_bit.h>
 #include <asm/io.h>
+#include <dm/device_compat.h>
+#include <power/regulator.h>
+#include <reset.h>
 
 #include "dwc2.h"
 
@@ -22,15 +25,18 @@
 #define DWC2_HC_CHANNEL			0
 
 #define DWC2_STATUS_BUF_SIZE		64
-#define DWC2_DATA_BUF_SIZE		(64 * 1024)
+#define DWC2_DATA_BUF_SIZE		(CONFIG_USB_DWC2_BUFFER_SIZE * 1024)
 
 #define MAX_DEVICE			16
 #define MAX_ENDPOINT			16
 
 struct dwc2_priv {
-#ifdef CONFIG_DM_USB
+#if CONFIG_IS_ENABLED(DM_USB)
 	uint8_t aligned_buffer[DWC2_DATA_BUF_SIZE] __aligned(ARCH_DMA_MINALIGN);
 	uint8_t status_buffer[DWC2_STATUS_BUF_SIZE] __aligned(ARCH_DMA_MINALIGN);
+#ifdef CONFIG_DM_REGULATOR
+	struct udevice *vbus_supply;
+#endif
 #else
 	uint8_t *aligned_buffer;
 	uint8_t *status_buffer;
@@ -39,9 +45,18 @@ struct dwc2_priv {
 	u8 out_data_toggle[MAX_DEVICE][MAX_ENDPOINT];
 	struct dwc2_core_regs *regs;
 	int root_hub_devnum;
+	bool ext_vbus;
+	/*
+	 * The hnp/srp capability must be disabled if the platform
+	 * does't support hnp/srp. Otherwise the force mode can't work.
+	 */
+	bool hnp_srp_disable;
+	bool oc_disable;
+
+	struct reset_ctl_bulk	resets;
 };
 
-#ifndef CONFIG_DM_USB
+#if !CONFIG_IS_ENABLED(DM_USB)
 /* We need cacheline-aligned buffers for DMA transfers and dcache support */
 DEFINE_ALIGN_BUFFER(uint8_t, aligned_buffer_addr, DWC2_DATA_BUF_SIZE,
 		ARCH_DMA_MINALIGN);
@@ -98,10 +113,10 @@ static void dwc_otg_flush_tx_fifo(struct dwc2_core_regs *regs, const int num)
 
 	writel(DWC2_GRSTCTL_TXFFLSH | (num << DWC2_GRSTCTL_TXFNUM_OFFSET),
 	       &regs->grstctl);
-	ret = wait_for_bit(__func__, &regs->grstctl, DWC2_GRSTCTL_TXFFLSH,
-			   false, 1000, false);
+	ret = wait_for_bit_le32(&regs->grstctl, DWC2_GRSTCTL_TXFFLSH,
+				false, 1000, false);
 	if (ret)
-		printf("%s: Timeout!\n", __func__);
+		dev_info(dev, "%s: Timeout!\n", __func__);
 
 	/* Wait for 3 PHY Clocks */
 	udelay(1);
@@ -117,10 +132,10 @@ static void dwc_otg_flush_rx_fifo(struct dwc2_core_regs *regs)
 	int ret;
 
 	writel(DWC2_GRSTCTL_RXFFLSH, &regs->grstctl);
-	ret = wait_for_bit(__func__, &regs->grstctl, DWC2_GRSTCTL_RXFFLSH,
-			   false, 1000, false);
+	ret = wait_for_bit_le32(&regs->grstctl, DWC2_GRSTCTL_RXFFLSH,
+				false, 1000, false);
 	if (ret)
-		printf("%s: Timeout!\n", __func__);
+		dev_info(dev, "%s: Timeout!\n", __func__);
 
 	/* Wait for 3 PHY Clocks */
 	udelay(1);
@@ -135,17 +150,17 @@ static void dwc_otg_core_reset(struct dwc2_core_regs *regs)
 	int ret;
 
 	/* Wait for AHB master IDLE state. */
-	ret = wait_for_bit(__func__, &regs->grstctl, DWC2_GRSTCTL_AHBIDLE,
-			   true, 1000, false);
+	ret = wait_for_bit_le32(&regs->grstctl, DWC2_GRSTCTL_AHBIDLE,
+				true, 1000, false);
 	if (ret)
-		printf("%s: Timeout!\n", __func__);
+		dev_info(dev, "%s: Timeout!\n", __func__);
 
 	/* Core Soft Reset */
 	writel(DWC2_GRSTCTL_CSFTRST, &regs->grstctl);
-	ret = wait_for_bit(__func__, &regs->grstctl, DWC2_GRSTCTL_CSFTRST,
-			   false, 1000, false);
+	ret = wait_for_bit_le32(&regs->grstctl, DWC2_GRSTCTL_CSFTRST,
+				false, 1000, false);
 	if (ret)
-		printf("%s: Timeout!\n", __func__);
+		dev_info(dev, "%s: Timeout!\n", __func__);
 
 	/*
 	 * Wait for core to come out of reset.
@@ -155,6 +170,57 @@ static void dwc_otg_core_reset(struct dwc2_core_regs *regs)
 	mdelay(100);
 }
 
+#if CONFIG_IS_ENABLED(DM_USB) && defined(CONFIG_DM_REGULATOR)
+static int dwc_vbus_supply_init(struct udevice *dev)
+{
+	struct dwc2_priv *priv = dev_get_priv(dev);
+	int ret;
+
+	ret = device_get_supply_regulator(dev, "vbus-supply",
+					  &priv->vbus_supply);
+	if (ret) {
+		debug("%s: No vbus supply\n", dev->name);
+		return 0;
+	}
+
+	ret = regulator_set_enable(priv->vbus_supply, true);
+	if (ret) {
+		dev_err(dev, "Error enabling vbus supply\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static int dwc_vbus_supply_exit(struct udevice *dev)
+{
+	struct dwc2_priv *priv = dev_get_priv(dev);
+	int ret;
+
+	if (priv->vbus_supply) {
+		ret = regulator_set_enable(priv->vbus_supply, false);
+		if (ret) {
+			dev_err(dev, "Error disabling vbus supply\n");
+			return ret;
+		}
+	}
+
+	return 0;
+}
+#else
+static int dwc_vbus_supply_init(struct udevice *dev)
+{
+	return 0;
+}
+
+#if CONFIG_IS_ENABLED(DM_USB)
+static int dwc_vbus_supply_exit(struct udevice *dev)
+{
+	return 0;
+}
+#endif
+#endif
+
 /*
  * This function initializes the DWC_otg controller registers for
  * host mode.
@@ -163,10 +229,12 @@ static void dwc_otg_core_reset(struct dwc2_core_regs *regs)
  * request queues. Host channels are reset to ensure that they are ready for
  * performing transfers.
  *
+ * @param dev USB Device (NULL if driver model is not being used)
  * @param regs Programming view of DWC_otg controller
  *
  */
-static void dwc_otg_core_host_init(struct dwc2_core_regs *regs)
+static void dwc_otg_core_host_init(struct udevice *dev,
+				   struct dwc2_core_regs *regs)
 {
 	uint32_t nptxfifosize = 0;
 	uint32_t ptxfifosize = 0;
@@ -228,10 +296,10 @@ static void dwc_otg_core_host_init(struct dwc2_core_regs *regs)
 		clrsetbits_le32(&regs->hc_regs[i].hcchar,
 				DWC2_HCCHAR_EPDIR,
 				DWC2_HCCHAR_CHEN | DWC2_HCCHAR_CHDIS);
-		ret = wait_for_bit(__func__, &regs->hc_regs[i].hcchar,
-				   DWC2_HCCHAR_CHEN, false, 1000, false);
+		ret = wait_for_bit_le32(&regs->hc_regs[i].hcchar,
+					DWC2_HCCHAR_CHEN, false, 1000, false);
 		if (ret)
-			printf("%s: Timeout!\n", __func__);
+			dev_info("%s: Timeout!\n", __func__);
 	}
 
 	/* Turn on the vbus power. */
@@ -244,6 +312,9 @@ static void dwc_otg_core_host_init(struct dwc2_core_regs *regs)
 			writel(hprt0, &regs->hprt0);
 		}
 	}
+
+	if (dev)
+		dwc_vbus_supply_init(dev);
 }
 
 /*
@@ -252,8 +323,9 @@ static void dwc_otg_core_host_init(struct dwc2_core_regs *regs)
  *
  * @param regs Programming view of the DWC_otg controller
  */
-static void dwc_otg_core_init(struct dwc2_core_regs *regs)
+static void dwc_otg_core_init(struct dwc2_priv *priv)
 {
+	struct dwc2_core_regs *regs = priv->regs;
 	uint32_t ahbcfg = 0;
 	uint32_t usbcfg = 0;
 	uint8_t brst_sz = CONFIG_DWC2_DMA_BURST_SIZE;
@@ -262,13 +334,15 @@ static void dwc_otg_core_init(struct dwc2_core_regs *regs)
 	usbcfg = readl(&regs->gusbcfg);
 
 	/* Program the ULPI External VBUS bit if needed */
-#ifdef CONFIG_DWC2_PHY_ULPI_EXT_VBUS
-	usbcfg |= (DWC2_GUSBCFG_ULPI_EXT_VBUS_DRV |
-		   DWC2_GUSBCFG_ULPI_INT_VBUS_INDICATOR |
-		   DWC2_GUSBCFG_INDICATOR_PASSTHROUGH);
-#else
-	usbcfg &= ~DWC2_GUSBCFG_ULPI_EXT_VBUS_DRV;
-#endif
+	if (priv->ext_vbus) {
+		usbcfg |= DWC2_GUSBCFG_ULPI_EXT_VBUS_DRV;
+		if (!priv->oc_disable) {
+			usbcfg |= DWC2_GUSBCFG_ULPI_INT_VBUS_INDICATOR |
+				  DWC2_GUSBCFG_INDICATOR_PASSTHROUGH;
+		}
+	} else {
+		usbcfg &= ~DWC2_GUSBCFG_ULPI_EXT_VBUS_DRV;
+	}
 
 	/* Set external TS Dline pulsing */
 #ifdef CONFIG_DWC2_TS_DLINE
@@ -330,7 +404,7 @@ static void dwc_otg_core_init(struct dwc2_core_regs *regs)
 		usbcfg &= ~DWC2_GUSBCFG_DDRSEL;
 #endif
 	} else {	/* UTMI+ interface */
-#if (CONFIG_DWC2_UTMI_PHY_WIDTH == 16)
+#if (CONFIG_DWC2_UTMI_WIDTH == 16)
 		usbcfg |= DWC2_GUSBCFG_PHYIF;
 #endif
 	}
@@ -354,6 +428,9 @@ static void dwc_otg_core_init(struct dwc2_core_regs *regs)
 		usbcfg |= DWC2_GUSBCFG_ULPI_CLK_SUS_M;
 	}
 #endif
+	if (priv->hnp_srp_disable)
+		usbcfg |= DWC2_GUSBCFG_FORCEHOSTMODE;
+
 	writel(usbcfg, &regs->gusbcfg);
 
 	/* Program the GAHBCFG Register. */
@@ -382,12 +459,16 @@ static void dwc_otg_core_init(struct dwc2_core_regs *regs)
 
 	writel(ahbcfg, &regs->gahbcfg);
 
-	/* Program the GUSBCFG register for HNP/SRP. */
-	setbits_le32(&regs->gusbcfg, DWC2_GUSBCFG_HNPCAP | DWC2_GUSBCFG_SRPCAP);
+	/* Program the capabilities in GUSBCFG Register */
+	usbcfg = 0;
 
+	if (!priv->hnp_srp_disable)
+		usbcfg |= DWC2_GUSBCFG_HNPCAP | DWC2_GUSBCFG_SRPCAP;
 #ifdef CONFIG_DWC2_IC_USB_CAP
-	setbits_le32(&regs->gusbcfg, DWC2_GUSBCFG_IC_USB_CAP);
+	usbcfg |= DWC2_GUSBCFG_IC_USB_CAP;
 #endif
+
+	setbits_le32(&regs->gusbcfg, usbcfg);
 }
 
 /*
@@ -731,8 +812,8 @@ int wait_for_chhltd(struct dwc2_hc_regs *hc_regs, uint32_t *sub, u8 *toggle)
 	int ret;
 	uint32_t hcint, hctsiz;
 
-	ret = wait_for_bit(__func__, &hc_regs->hcint, DWC2_HCINT_CHHLTD, true,
-			   1000, false);
+	ret = wait_for_bit_le32(&hc_regs->hcint, DWC2_HCINT_CHHLTD, true,
+				2000, false);
 	if (ret)
 		return ret;
 
@@ -777,12 +858,19 @@ static int transfer_chunk(struct dwc2_hc_regs *hc_regs, void *aligned_buffer,
 	       (*pid << DWC2_HCTSIZ_PID_OFFSET),
 	       &hc_regs->hctsiz);
 
-	if (!in && xfer_len) {
-		memcpy(aligned_buffer, buffer, xfer_len);
-
-		flush_dcache_range((unsigned long)aligned_buffer,
-				   (unsigned long)aligned_buffer +
-				   roundup(xfer_len, ARCH_DMA_MINALIGN));
+	if (xfer_len) {
+		if (in) {
+			invalidate_dcache_range(
+					(uintptr_t)aligned_buffer,
+					(uintptr_t)aligned_buffer +
+					roundup(xfer_len, ARCH_DMA_MINALIGN));
+		} else {
+			memcpy(aligned_buffer, buffer, xfer_len);
+			flush_dcache_range(
+					(uintptr_t)aligned_buffer,
+					(uintptr_t)aligned_buffer +
+					roundup(xfer_len, ARCH_DMA_MINALIGN));
+		}
 	}
 
 	writel(phys_to_bus((unsigned long)aligned_buffer), &hc_regs->hcdma);
@@ -1022,7 +1110,8 @@ static int _submit_control_msg(struct dwc2_priv *priv, struct usb_device *dev,
 }
 
 int _submit_int_msg(struct dwc2_priv *priv, struct usb_device *dev,
-		    unsigned long pipe, void *buffer, int len, int interval)
+		    unsigned long pipe, void *buffer, int len, int interval,
+		    bool nonblock)
 {
 	unsigned long timeout;
 	int ret;
@@ -1032,32 +1121,72 @@ int _submit_int_msg(struct dwc2_priv *priv, struct usb_device *dev,
 	timeout = get_timer(0) + USB_TIMEOUT_MS(pipe);
 	for (;;) {
 		if (get_timer(0) > timeout) {
-			printf("Timeout poll on interrupt endpoint\n");
+			dev_err(dev, "Timeout poll on interrupt endpoint\n");
 			return -ETIMEDOUT;
 		}
 		ret = _submit_bulk_msg(priv, dev, pipe, buffer, len);
-		if (ret != -EAGAIN)
+		if ((ret != -EAGAIN) || nonblock)
 			return ret;
 	}
 }
 
-static int dwc2_init_common(struct dwc2_priv *priv)
+static int dwc2_reset(struct udevice *dev)
+{
+	int ret;
+	struct dwc2_priv *priv = dev_get_priv(dev);
+
+	ret = reset_get_bulk(dev, &priv->resets);
+	if (ret) {
+		dev_warn(dev, "Can't get reset: %d\n", ret);
+		/* Return 0 if error due to !CONFIG_DM_RESET and reset
+		 * DT property is not present.
+		 */
+		if (ret == -ENOENT || ret == -ENOTSUPP)
+			return 0;
+		else
+			return ret;
+	}
+
+	ret = reset_deassert_bulk(&priv->resets);
+	if (ret) {
+		reset_release_bulk(&priv->resets);
+		dev_err(dev, "Failed to reset: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int dwc2_init_common(struct udevice *dev, struct dwc2_priv *priv)
 {
 	struct dwc2_core_regs *regs = priv->regs;
 	uint32_t snpsid;
 	int i, j;
+	int ret;
+
+	ret = dwc2_reset(dev);
+	if (ret)
+		return ret;
 
 	snpsid = readl(&regs->gsnpsid);
-	printf("Core Release: %x.%03x\n", snpsid >> 12 & 0xf, snpsid & 0xfff);
+	dev_info(dev, "Core Release: %x.%03x\n",
+		 snpsid >> 12 & 0xf, snpsid & 0xfff);
 
 	if ((snpsid & DWC2_SNPSID_DEVID_MASK) != DWC2_SNPSID_DEVID_VER_2xx &&
 	    (snpsid & DWC2_SNPSID_DEVID_MASK) != DWC2_SNPSID_DEVID_VER_3xx) {
-		printf("SNPSID invalid (not DWC2 OTG device): %08x\n", snpsid);
+		dev_info(dev, "SNPSID invalid (not DWC2 OTG device): %08x\n",
+			 snpsid);
 		return -ENODEV;
 	}
 
-	dwc_otg_core_init(regs);
-	dwc_otg_core_host_init(regs);
+#ifdef CONFIG_DWC2_PHY_ULPI_EXT_VBUS
+	priv->ext_vbus = 1;
+#else
+	priv->ext_vbus = 0;
+#endif
+
+	dwc_otg_core_init(priv);
+	dwc_otg_core_host_init(dev, regs);
 
 	clrsetbits_le32(&regs->hprt0, DWC2_HPRT0_PRTENA |
 			DWC2_HPRT0_PRTCONNDET | DWC2_HPRT0_PRTENCHNG |
@@ -1075,6 +1204,15 @@ static int dwc2_init_common(struct dwc2_priv *priv)
 		}
 	}
 
+	/*
+	 * Add a 1 second delay here. This gives the host controller
+	 * a bit time before the comminucation with the USB devices
+	 * is started (the bus is scanned) and  fixes the USB detection
+	 * problems with some problematic USB keys.
+	 */
+	if (readl(&regs->gintsts) & DWC2_GINTSTS_CURMODE_HOST)
+		mdelay(1000);
+
 	return 0;
 }
 
@@ -1087,7 +1225,7 @@ static void dwc2_uninit_common(struct dwc2_core_regs *regs)
 			DWC2_HPRT0_PRTRST);
 }
 
-#ifndef CONFIG_DM_USB
+#if !CONFIG_IS_ENABLED(DM_USB)
 int submit_control_msg(struct usb_device *dev, unsigned long pipe, void *buffer,
 		       int len, struct devrequest *setup)
 {
@@ -1101,9 +1239,10 @@ int submit_bulk_msg(struct usb_device *dev, unsigned long pipe, void *buffer,
 }
 
 int submit_int_msg(struct usb_device *dev, unsigned long pipe, void *buffer,
-		   int len, int interval)
+		   int len, int interval, bool nonblock)
 {
-	return _submit_int_msg(&local, dev, pipe, buffer, len, interval);
+	return _submit_int_msg(&local, dev, pipe, buffer, len, interval,
+			       nonblock);
 }
 
 /* U-Boot USB control interface */
@@ -1121,7 +1260,7 @@ int usb_lowlevel_init(int index, enum usb_init_type init, void **controller)
 	if (board_usb_init(index, USB_INIT_HOST))
 		return -1;
 
-	return dwc2_init_common(priv);
+	return dwc2_init_common(NULL, priv);
 }
 
 int usb_lowlevel_stop(int index)
@@ -1132,7 +1271,7 @@ int usb_lowlevel_stop(int index)
 }
 #endif
 
-#ifdef CONFIG_DM_USB
+#if CONFIG_IS_ENABLED(DM_USB)
 static int dwc2_submit_control_msg(struct udevice *dev, struct usb_device *udev,
 				   unsigned long pipe, void *buffer, int length,
 				   struct devrequest *setup)
@@ -1157,13 +1296,14 @@ static int dwc2_submit_bulk_msg(struct udevice *dev, struct usb_device *udev,
 
 static int dwc2_submit_int_msg(struct udevice *dev, struct usb_device *udev,
 			       unsigned long pipe, void *buffer, int length,
-			       int interval)
+			       int interval, bool nonblock)
 {
 	struct dwc2_priv *priv = dev_get_priv(dev);
 
 	debug("%s: dev='%s', udev=%p\n", __func__, dev->name, udev);
 
-	return _submit_int_msg(priv, udev, pipe, buffer, length, interval);
+	return _submit_int_msg(priv, udev, pipe, buffer, length, interval,
+			       nonblock);
 }
 
 static int dwc2_usb_ofdata_to_platdata(struct udevice *dev)
@@ -1171,10 +1311,13 @@ static int dwc2_usb_ofdata_to_platdata(struct udevice *dev)
 	struct dwc2_priv *priv = dev_get_priv(dev);
 	fdt_addr_t addr;
 
-	addr = dev_get_addr(dev);
+	addr = dev_read_addr(dev);
 	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
 	priv->regs = (struct dwc2_core_regs *)addr;
+
+	priv->oc_disable = dev_read_bool(dev, "disable-over-current");
+	priv->hnp_srp_disable = dev_read_bool(dev, "hnp-srp-disable");
 
 	return 0;
 }
@@ -1182,15 +1325,25 @@ static int dwc2_usb_ofdata_to_platdata(struct udevice *dev)
 static int dwc2_usb_probe(struct udevice *dev)
 {
 	struct dwc2_priv *priv = dev_get_priv(dev);
+	struct usb_bus_priv *bus_priv = dev_get_uclass_priv(dev);
 
-	return dwc2_init_common(priv);
+	bus_priv->desc_before_addr = true;
+
+	return dwc2_init_common(dev, priv);
 }
 
 static int dwc2_usb_remove(struct udevice *dev)
 {
 	struct dwc2_priv *priv = dev_get_priv(dev);
+	int ret;
+
+	ret = dwc_vbus_supply_exit(dev);
+	if (ret)
+		return ret;
 
 	dwc2_uninit_common(priv->regs);
+
+	reset_release_bulk(&priv->resets);
 
 	return 0;
 }
@@ -1203,6 +1356,7 @@ struct dm_usb_ops dwc2_usb_ops = {
 
 static const struct udevice_id dwc2_usb_ids[] = {
 	{ .compatible = "brcm,bcm2835-usb" },
+	{ .compatible = "brcm,bcm2708-usb" },
 	{ .compatible = "snps,dwc2" },
 	{ }
 };

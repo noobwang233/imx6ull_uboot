@@ -1,14 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * From Coreboot src/southbridge/intel/bd82x6x/early_me.c
  *
  * Copyright (C) 2011 The Chromium OS Authors. All rights reserved.
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <sysreset.h>
 #include <asm/pci.h>
 #include <asm/cpu.h>
 #include <asm/processor.h>
@@ -26,35 +26,6 @@ static const char *const me_ack_values[] = {
 	[ME_HFS_ACK_GBL_RESET]	= "Global Reset",
 	[ME_HFS_ACK_CONTINUE]	= "Continue to boot"
 };
-
-static inline void pci_read_dword_ptr(struct udevice *me_dev, void *ptr,
-				      int offset)
-{
-	u32 dword;
-
-	dm_pci_read_config32(me_dev, offset, &dword);
-	memcpy(ptr, &dword, sizeof(dword));
-}
-
-static inline void pci_write_dword_ptr(struct udevice *me_dev, void *ptr,
-				       int offset)
-{
-	u32 dword = 0;
-
-	memcpy(&dword, ptr, sizeof(dword));
-	dm_pci_write_config32(me_dev, offset, dword);
-}
-
-void intel_early_me_status(struct udevice *me_dev)
-{
-	struct me_hfs hfs;
-	struct me_gmes gmes;
-
-	pci_read_dword_ptr(me_dev, &hfs, PCI_ME_HFS);
-	pci_read_dword_ptr(me_dev, &gmes, PCI_ME_GMES);
-
-	intel_me_status(&hfs, &gmes);
-}
 
 int intel_early_me_init(struct udevice *me_dev)
 {
@@ -159,7 +130,7 @@ int intel_early_me_init_done(struct udevice *dev, struct udevice *me_dev,
 	debug("ME: Requested BIOS Action: %s\n", me_ack_values[hfs.ack_data]);
 
 	/* Check status after acknowledgement */
-	intel_early_me_status(me_dev);
+	intel_me_status(me_dev);
 
 	switch (hfs.ack_data) {
 	case ME_HFS_ACK_CONTINUE:
@@ -168,17 +139,17 @@ int intel_early_me_init_done(struct udevice *dev, struct udevice *me_dev,
 	case ME_HFS_ACK_RESET:
 		/* Non-power cycle reset */
 		set_global_reset(dev, 0);
-		reset_cpu(0);
+		sysreset_walk_halt(SYSRESET_COLD);
 		break;
 	case ME_HFS_ACK_PWR_CYCLE:
 		/* Power cycle reset */
 		set_global_reset(dev, 0);
-		x86_full_reset();
+		sysreset_walk_halt(SYSRESET_COLD);
 		break;
 	case ME_HFS_ACK_GBL_RESET:
 		/* Global reset */
 		set_global_reset(dev, 1);
-		x86_full_reset();
+		sysreset_walk_halt(SYSRESET_COLD);
 		break;
 	case ME_HFS_ACK_S3:
 	case ME_HFS_ACK_S4:
@@ -191,7 +162,6 @@ int intel_early_me_init_done(struct udevice *dev, struct udevice *me_dev,
 
 static const struct udevice_id ivybridge_syscon_ids[] = {
 	{ .compatible = "intel,me", .data = X86_SYSCON_ME },
-	{ .compatible = "intel,gma", .data = X86_SYSCON_GMA },
 	{ }
 };
 

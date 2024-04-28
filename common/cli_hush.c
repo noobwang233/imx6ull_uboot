@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * sh.c -- a prototype Bourne shell grammar parser
  *      Intended to follow the original Thompson and Ritchie
@@ -70,15 +71,14 @@
  *      document how quoting rules not precisely followed for variable assignments
  *      maybe change map[] to use 2-bit entries
  *      (eventually) remove all the printf's
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #define __U_BOOT__
 #ifdef __U_BOOT__
+#include <common.h>         /* readline */
+#include <env.h>
 #include <malloc.h>         /* malloc, free, realloc*/
 #include <linux/ctype.h>    /* isalpha, isdigit */
-#include <common.h>        /* readline */
 #include <console.h>
 #include <bootretry.h>
 #include <cli.h>
@@ -560,7 +560,7 @@ static int builtin_cd(struct child_prog *child)
 {
 	char *newdir;
 	if (child->argv[1] == NULL)
-		newdir = getenv("HOME");
+		newdir = env_get("HOME");
 	else
 		newdir = child->argv[1];
 	if (chdir(newdir)) {
@@ -948,7 +948,7 @@ static inline void cmdedit_set_initial_prompt(void)
 #ifndef CONFIG_FEATURE_SH_FANCY_PROMPT
 	PS1 = NULL;
 #else
-	PS1 = getenv("PS1");
+	PS1 = env_get("PS1");
 	if(PS1==0)
 		PS1 = "\\w \\$ ";
 #endif
@@ -987,9 +987,9 @@ static int uboot_cli_readline(struct in_str *i)
 
 #ifdef CONFIG_CMDLINE_PS_SUPPORT
 	if (i->promptmode == 1)
-		ps_prompt = getenv("PS1");
+		ps_prompt = env_get("PS1");
 	else
-		ps_prompt = getenv("PS2");
+		ps_prompt = env_get("PS2");
 	if (ps_prompt)
 		prompt = ps_prompt;
 #endif
@@ -2172,7 +2172,7 @@ int set_local_var(const char *s, int flg_export)
 	name=strdup(s);
 
 #ifdef __U_BOOT__
-	if (getenv(name) != NULL) {
+	if (env_get(name) != NULL) {
 		printf ("ERROR: "
 				"There is a global environment variable with the same name.\n");
 		free(name);
@@ -2265,7 +2265,7 @@ void unset_local_var(const char *name)
 			} else {
 #ifndef __U_BOOT__
 				if(cur->flg_export)
-					unsetenv(cur->name);
+					unenv_set(cur->name);
 #endif
 				free(cur->name);
 				free(cur->value);
@@ -2793,7 +2793,7 @@ static char *lookup_param(char *src)
 		}
 	}
 
-	p = getenv(src);
+	p = env_get(src);
 	if (!p)
 		p = get_local_var(src);
 
@@ -3157,7 +3157,7 @@ static void mapset(const unsigned char *set, int code)
 static void update_ifs_map(void)
 {
 	/* char *ifs and char map[256] are both globals. */
-	ifs = (uchar *)getenv("IFS");
+	ifs = (uchar *)env_get("IFS");
 	if (ifs == NULL) ifs=(uchar *)" \t\n";
 	/* Precompute a list of 'flow through' behavior so it can be treated
 	 * quickly up front.  Computation is necessary because of IFS.
@@ -3198,7 +3198,7 @@ static int parse_stream_outer(struct in_str *inp, int flag)
 		if (!(flag & FLAG_PARSE_SEMICOLON) || (flag & FLAG_REPARSING)) mapset((uchar *)";$&|", 0);
 		inp->promptmode=1;
 		rcode = parse_stream(&temp, &ctx, inp,
-				     flag & FLAG_CONT_ON_NEWLINE ? -1 : '\n'); // 命令解析
+				     flag & FLAG_CONT_ON_NEWLINE ? -1 : '\n');
 #ifdef __U_BOOT__
 		if (rcode == 1) flag_repeat = 0;
 #endif
@@ -3214,7 +3214,7 @@ static int parse_stream_outer(struct in_str *inp, int flag)
 #ifndef __U_BOOT__
 			run_list(ctx.list_head);
 #else
-			code = run_list(ctx.list_head);				//执行命令
+			code = run_list(ctx.list_head);
 			if (code == -2) {	/* exit */
 				b_free(&temp);
 				code = 0;
@@ -3295,12 +3295,8 @@ int parse_file_outer(void)
 #ifndef __U_BOOT__
 	setup_file_in_str(&input, f);
 #else
-	setup_file_in_str(&input); //初始化变量 input的成员变量
+	setup_file_in_str(&input);
 #endif
-/*
- * 这个函数就是 hush shell的命令解释器，负责接收命令行输入，
- * 然后解析并执行相应的命令，函数 parse_stream_outer定义在文件 common/cli_hush.c
- */
 	rcode = parse_stream_outer(&input, FLAG_PARSE_SEMICOLON);
 	return rcode;
 }

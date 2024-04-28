@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2002
  * Richard Jones, rjones@nexus-tech.net
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -32,7 +31,7 @@ U_BOOT_CMD(
 	"      and determine its size."
 );
 
-int do_fat_fsload (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+int do_fat_fsload(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	return do_load(cmdtp, flag, argc, argv, FS_TYPE_FAT);
 }
@@ -69,29 +68,24 @@ static int do_fat_fsinfo(cmd_tbl_t *cmdtp, int flag, int argc,
 			 char * const argv[])
 {
 	int dev, part;
-	block_dev_desc_t *dev_desc;
+	struct blk_desc *dev_desc;
 	disk_partition_t info;
 
 	if (argc < 2) {
 		printf("usage: fatinfo <interface> [<dev[:part]>]\n");
 		return 0;
 	}
-	// 从用户输入（eg: argv[1] = "mmc", argv[2] = "1:2"）获取对应的块设备信息和分区信息，保存到dev_desc和info
-	// 返回值part为分区数量
-	part = get_device_and_partition(argv[1], argv[2], &dev_desc, &info, 1);
-	if (part < 0)
-		return 1; //获取失败
 
-	dev = dev_desc->dev;//设备序号
-	// 检查dev_desc设备的info分区是否为fat文件系统，如果是的话，更新fs/fat.c下的两个全局变量
-	// static block_dev_desc_t *cur_dev;
-	// static disk_partition_t cur_part_info;
+	part = blk_get_device_part_str(argv[1], argv[2], &dev_desc, &info, 1);
+	if (part < 0)
+		return 1;
+
+	dev = dev_desc->devnum;
 	if (fat_set_blk_dev(dev_desc, &info) != 0) {
 		printf("\n** Unable to use %s %d:%d for fatinfo **\n",
 			argv[1], dev, part);
 		return 1;
 	}
-	// 打印fs/fat.c下全局变量cur_dev和cur_part_info指向的设备和分区信息
 	return file_fat_detectfs();
 }
 
@@ -110,7 +104,8 @@ static int do_fat_fswrite(cmd_tbl_t *cmdtp, int flag,
 	int ret;
 	unsigned long addr;
 	unsigned long count;
-	block_dev_desc_t *dev_desc = NULL;
+	long offset;
+	struct blk_desc *dev_desc = NULL;
 	disk_partition_t info;
 	int dev = 0;
 	int part = 1;
@@ -119,11 +114,11 @@ static int do_fat_fswrite(cmd_tbl_t *cmdtp, int flag,
 	if (argc < 5)
 		return cmd_usage(cmdtp);
 
-	part = get_device_and_partition(argv[1], argv[2], &dev_desc, &info, 1);
+	part = blk_get_device_part_str(argv[1], argv[2], &dev_desc, &info, 1);
 	if (part < 0)
 		return 1;
 
-	dev = dev_desc->dev;
+	dev = dev_desc->devnum;
 
 	if (fat_set_blk_dev(dev_desc, &info) != 0) {
 		printf("\n** Unable to use %s %d:%d for fatwrite **\n",
@@ -131,10 +126,12 @@ static int do_fat_fswrite(cmd_tbl_t *cmdtp, int flag,
 		return 1;
 	}
 	addr = simple_strtoul(argv[3], NULL, 16);
-	count = simple_strtoul(argv[5], NULL, 16);
+	count = (argc <= 5) ? 0 : simple_strtoul(argv[5], NULL, 16);
+	/* offset should be a hex, but "-1" is allowed */
+	offset = (argc <= 6) ? 0 : simple_strtol(argv[6], NULL, 16);
 
 	buf = map_sysmem(addr, count);
-	ret = file_fat_write(argv[4], buf, 0, count, &size);
+	ret = file_fat_write(argv[4], buf, offset, count, &size);
 	unmap_sysmem(buf);
 	if (ret < 0) {
 		printf("\n** Unable to write \"%s\" from %s %d:%d **\n",
@@ -148,10 +145,35 @@ static int do_fat_fswrite(cmd_tbl_t *cmdtp, int flag,
 }
 
 U_BOOT_CMD(
-	fatwrite,	6,	0,	do_fat_fswrite,
+	fatwrite,	7,	0,	do_fat_fswrite,
 	"write file into a dos filesystem",
-	"<interface> <dev[:part]> <addr> <filename> <bytes>\n"
+	"<interface> <dev[:part]> <addr> <filename> [<bytes> [<offset>]]\n"
 	"    - write file 'filename' from the address 'addr' in RAM\n"
 	"      to 'dev' on 'interface'"
+);
+
+static int do_fat_rm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	return do_rm(cmdtp, flag, argc, argv, FS_TYPE_FAT);
+}
+
+U_BOOT_CMD(
+	fatrm,	4,	1,	do_fat_rm,
+	"delete a file",
+	"<interface> [<dev[:part]>] <filename>\n"
+	"    - delete a file from 'dev' on 'interface'"
+);
+
+static int do_fat_mkdir(cmd_tbl_t *cmdtp, int flag, int argc,
+			char * const argv[])
+{
+	return do_mkdir(cmdtp, flag, argc, argv, FS_TYPE_FAT);
+}
+
+U_BOOT_CMD(
+	fatmkdir,	4,	1,	do_fat_mkdir,
+	"create a directory",
+	"<interface> [<dev[:part]>] <directory>\n"
+	"    - create a directory in 'dev' on 'interface'"
 );
 #endif

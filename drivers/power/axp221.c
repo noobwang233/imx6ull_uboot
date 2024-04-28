@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * AXP221 and AXP223 driver
  *
@@ -6,8 +7,6 @@
  *
  * (C) Copyright 2014 Hans de Goede <hdegoede@redhat.com>
  * (C) Copyright 2013 Oliver Schinagl <oliver@schinagl.nl>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -191,33 +190,20 @@ int axp_set_eldo(int eldo_num, unsigned int mvolt)
 {
 	int ret;
 	u8 cfg = axp221_mvolt_to_cfg(mvolt, 700, 3300, 100);
-	u8 addr, bits;
 
-	switch (eldo_num) {
-	case 3:
-		addr = AXP221_ELDO3_CTRL;
-		bits = AXP221_OUTPUT_CTRL2_ELDO3_EN;
-		break;
-	case 2:
-		addr = AXP221_ELDO2_CTRL;
-		bits = AXP221_OUTPUT_CTRL2_ELDO2_EN;
-		break;
-	case 1:
-		addr = AXP221_ELDO1_CTRL;
-		bits = AXP221_OUTPUT_CTRL2_ELDO1_EN;
-		break;
-	default:
+	if (eldo_num < 1 || eldo_num > 3)
 		return -EINVAL;
-	}
 
 	if (mvolt == 0)
-		return pmic_bus_clrbits(AXP221_OUTPUT_CTRL2, bits);
+		return pmic_bus_clrbits(AXP221_OUTPUT_CTRL2,
+				AXP221_OUTPUT_CTRL2_ELDO1_EN << (eldo_num - 1));
 
-	ret = pmic_bus_write(addr, cfg);
+	ret = pmic_bus_write(AXP221_ELDO1_CTRL + (eldo_num - 1), cfg);
 	if (ret)
 		return ret;
 
-	return pmic_bus_setbits(AXP221_OUTPUT_CTRL2, bits);
+	return pmic_bus_setbits(AXP221_OUTPUT_CTRL2,
+				AXP221_OUTPUT_CTRL2_ELDO1_EN << (eldo_num - 1));
 }
 
 int axp_init(void)
@@ -235,6 +221,18 @@ int axp_init(void)
 
 	if (!(axp_chip_id == 0x6 || axp_chip_id == 0x7 || axp_chip_id == 0x17))
 		return -ENODEV;
+
+	/*
+	 * Turn off LDOIO regulators / tri-state GPIO pins, when rebooting
+	 * from android these are sometimes on.
+	 */
+	ret = pmic_bus_write(AXP_GPIO0_CTRL, AXP_GPIO_CTRL_INPUT);
+	if (ret)
+		return ret;
+
+	ret = pmic_bus_write(AXP_GPIO1_CTRL, AXP_GPIO_CTRL_INPUT);
+	if (ret)
+		return ret;
 
 	return 0;
 }

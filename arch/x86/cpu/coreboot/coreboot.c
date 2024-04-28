@@ -1,13 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
  * (C) Copyright 2008
  * Graeme Russ, graeme.russ@gmail.com.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <fdtdec.h>
+#include <usb.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
@@ -29,7 +30,7 @@ int arch_cpu_init(void)
 	return x86_cpu_init_f();
 }
 
-int board_early_init_f(void)
+int checkcpu(void)
 {
 	return 0;
 }
@@ -39,15 +40,7 @@ int print_cpuinfo(void)
 	return default_print_cpuinfo();
 }
 
-int last_stage_init(void)
-{
-	if (gd->flags & GD_FLG_COLD_BOOT)
-		timestamp_add_to_bootstage();
-
-	return 0;
-}
-
-void board_final_cleanup(void)
+static void board_final_cleanup(void)
 {
 	/*
 	 * Un-cache the ROM so the kernel has one
@@ -63,10 +56,10 @@ void board_final_cleanup(void)
 	if (top_type == MTRR_TYPE_WRPROT) {
 		struct mtrr_state state;
 
-		mtrr_open(&state);
+		mtrr_open(&state, true);
 		wrmsrl(MTRR_PHYS_BASE_MSR(top_mtrr), 0);
 		wrmsrl(MTRR_PHYS_MASK_MSR(top_mtrr), 0);
-		mtrr_close(&state);
+		mtrr_close(&state, true);
 	}
 
 	if (!fdtdec_get_config_bool(gd->fdt_blob, "u-boot,no-apm-finalize")) {
@@ -79,12 +72,13 @@ void board_final_cleanup(void)
 	}
 }
 
-int misc_init_r(void)
+int last_stage_init(void)
 {
-	return 0;
-}
+	/* start usb so that usb keyboard can be used as input device */
+	if (CONFIG_IS_ENABLED(USB_KEYBOARD))
+		usb_init();
 
-int arch_misc_init(void)
-{
+	board_final_cleanup();
+
 	return 0;
 }

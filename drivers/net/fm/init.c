@@ -1,11 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2011-2015 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <errno.h>
 #include <common.h>
 #include <asm/io.h>
+#include <fdt_support.h>
 #include <fsl_mdio.h>
 #ifdef CONFIG_FSL_LAYERSCAPE
 #include <asm/arch/fsl_serdes.h>
@@ -328,7 +328,8 @@ void fdt_fixup_fman_ethernet(void *blob)
 				ft_fixup_port(blob, &fm_info[i],
 					      "fsl,fman-1g-mac");
 		} else {
-			if (ft_fixup_port(blob, &fm_info[i], "fsl,fman-tgec"))
+			if (ft_fixup_port(blob, &fm_info[i], "fsl,fman-xgec") &&
+			    ft_fixup_port(blob, &fm_info[i], "fsl,fman-tgec"))
 				ft_fixup_port(blob, &fm_info[i],
 					      "fsl,fman-10g-mac");
 		}

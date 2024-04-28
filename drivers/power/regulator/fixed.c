@@ -1,48 +1,30 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  *  Copyright (C) 2015 Samsung Electronics
  *
  *  Przemyslaw Marczak <p.marczak@samsung.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
+#include "regulator_common.h"
 #include <common.h>
-#include <fdtdec.h>
 #include <errno.h>
 #include <dm.h>
-#include <i2c.h>
-#include <asm/gpio.h>
 #include <power/pmic.h>
 #include <power/regulator.h>
-
-DECLARE_GLOBAL_DATA_PTR;
-
-struct fixed_regulator_platdata {
-	struct gpio_desc gpio; /* GPIO for regulator enable control */
-};
 
 static int fixed_regulator_ofdata_to_platdata(struct udevice *dev)
 {
 	struct dm_regulator_uclass_platdata *uc_pdata;
-	struct fixed_regulator_platdata *dev_pdata;
-	struct gpio_desc *gpio;
-	int ret;
+	struct regulator_common_platdata *dev_pdata;
 
 	dev_pdata = dev_get_platdata(dev);
 	uc_pdata = dev_get_uclass_platdata(dev);
 	if (!uc_pdata)
 		return -ENXIO;
 
-	/* Set type to fixed */
 	uc_pdata->type = REGULATOR_TYPE_FIXED;
 
-	/* Get fixed regulator gpio desc */
-	gpio = &dev_pdata->gpio;
-	ret = gpio_request_by_name(dev, "gpio", 0, gpio, GPIOD_IS_OUT);
-	if (ret)
-		debug("Fixed regulator gpio - not found! Error: %d", ret);
-
-	return 0;
+	return regulator_common_ofdata_to_platdata(dev, dev_pdata, "gpio");
 }
 
 static int fixed_regulator_get_value(struct udevice *dev)
@@ -77,31 +59,14 @@ static int fixed_regulator_get_current(struct udevice *dev)
 	return uc_pdata->min_uA;
 }
 
-static bool fixed_regulator_get_enable(struct udevice *dev)
+static int fixed_regulator_get_enable(struct udevice *dev)
 {
-	struct fixed_regulator_platdata *dev_pdata = dev_get_platdata(dev);
-
-	if (!dev_pdata->gpio.dev)
-		return false;
-
-	return dm_gpio_get_value(&dev_pdata->gpio);
+	return regulator_common_get_enable(dev, dev_get_platdata(dev));
 }
 
 static int fixed_regulator_set_enable(struct udevice *dev, bool enable)
 {
-	struct fixed_regulator_platdata *dev_pdata = dev_get_platdata(dev);
-	int ret;
-
-	if (!dev_pdata->gpio.dev)
-		return -ENOSYS;
-
-	ret = dm_gpio_set_value(&dev_pdata->gpio, enable);
-	if (ret) {
-		error("Can't set regulator : %s gpio to: %d\n", dev->name,
-		      enable);
-		return ret;
-	}
-	return 0;
+	return regulator_common_set_enable(dev, dev_get_platdata(dev), enable);
 }
 
 static const struct dm_regulator_ops fixed_regulator_ops = {
@@ -122,5 +87,5 @@ U_BOOT_DRIVER(fixed_regulator) = {
 	.ops = &fixed_regulator_ops,
 	.of_match = fixed_regulator_ids,
 	.ofdata_to_platdata = fixed_regulator_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct fixed_regulator_platdata),
+	.platdata_auto_alloc_size = sizeof(struct regulator_common_platdata),
 };

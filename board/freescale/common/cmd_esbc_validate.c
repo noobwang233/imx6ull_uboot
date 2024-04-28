@@ -1,14 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2015 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <command.h>
+#include <env.h>
 #include <fsl_validate.h>
 
-static int do_esbc_halt(cmd_tbl_t *cmdtp, int flag, int argc,
+int do_esbc_halt(cmd_tbl_t *cmdtp, int flag, int argc,
 				char * const argv[])
 {
 	if (fsl_check_boot_mode_secure() == 0) {
@@ -23,12 +23,15 @@ loop:
 	return 0;
 }
 
+#ifndef CONFIG_SPL_BUILD
 static int do_esbc_validate(cmd_tbl_t *cmdtp, int flag, int argc,
 				char * const argv[])
 {
 	char *hash_str = NULL;
 	uintptr_t haddr;
 	int ret;
+	uintptr_t img_addr = 0;
+	char buf[20];
 
 	if (argc < 2)
 		return cmd_usage(cmdtp);
@@ -43,7 +46,15 @@ static int do_esbc_validate(cmd_tbl_t *cmdtp, int flag, int argc,
 	 * part of header. So, the function is called
 	 * by passing this argument as 0.
 	 */
-	ret = fsl_secboot_validate(haddr, hash_str, 0);
+	ret = fsl_secboot_validate(haddr, hash_str, &img_addr);
+
+	/* Need to set "img_addr" even if validation failure.
+	 * Required when SB_EN in RCW set and non-fatal error
+	 * to continue U-Boot
+	 */
+	sprintf(buf, "%lx", img_addr);
+	env_set("img_addr", buf);
+
 	if (ret)
 		return 1;
 
@@ -72,3 +83,4 @@ U_BOOT_CMD(
 	"Put the core in spin loop (Secure Boot Only)",
 	""
 );
+#endif

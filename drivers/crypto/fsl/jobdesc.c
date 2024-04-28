@@ -1,20 +1,22 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * SEC Descriptor Construction Library
  * Basic job descriptor construction
  *
  * Copyright 2014 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
+ * Copyright 2018 NXP
  *
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <fsl_sec.h>
 #include "desc_constr.h"
 #include "jobdesc.h"
 #include "rsa_caam.h"
 
-#if defined(CONFIG_MX6) || defined(CONFIG_MX7)
+#if defined(CONFIG_MX6) || defined(CONFIG_MX7) || defined(CONFIG_MX7ULP) || \
+		defined(CONFIG_IMX8M)
 /*!
  * Secure memory run command
  *
@@ -41,7 +43,7 @@ uint32_t secmem_set_cmd(uint32_t sec_mem_cmd)
 /*!
  * CAAM page allocation:
  * Allocates a partition from secure memory, with the id
- * equal to partion_num. This will de-allocate the page
+ * equal to partition_num. This will de-allocate the page
  * if it is already allocated. The partition will have
  * full access permissions. The permissions are set before,
  * running a job descriptor. A memory page of secure RAM
@@ -162,9 +164,9 @@ int inline_cnstr_jobdesc_blob_dek(uint32_t *desc, const uint8_t *plain_txt,
 
 	append_u32(desc, aad_w2);
 
-	append_cmd_ptr(desc, (dma_addr_t)SEC_MEM_PAGE1, in_sz, CMD_SEQ_IN_PTR);
+	append_cmd_ptr(desc, (caam_dma_addr_t)SEC_MEM_PAGE1, in_sz, CMD_SEQ_IN_PTR);
 
-	append_cmd_ptr(desc, (dma_addr_t)dek_blob + 8, out_sz, CMD_SEQ_OUT_PTR);
+	append_cmd_ptr(desc, (caam_dma_addr_t)(ulong)(dek_blob + 8), out_sz, CMD_SEQ_OUT_PTR);
 
 	append_operation(desc, OP_TYPE_ENCAP_PROTOCOL | OP_PCLID_BLOB |
 						OP_PCLID_SECMEM);
@@ -180,7 +182,7 @@ void inline_cnstr_jobdesc_hash(uint32_t *desc,
 	/* SHA 256 , output is of length 32 words */
 	uint32_t storelen = alg_size;
 	u32 options;
-	dma_addr_t dma_addr_in, dma_addr_out;
+	caam_dma_addr_t dma_addr_in, dma_addr_out;
 
 	dma_addr_in = virt_to_phys((void *)msg);
 	dma_addr_out = virt_to_phys((void *)digest);
@@ -204,12 +206,12 @@ void inline_cnstr_jobdesc_hash(uint32_t *desc,
 	append_store(desc, dma_addr_out, storelen,
 		     LDST_CLASS_2_CCB | LDST_SRCDST_BYTE_CONTEXT);
 }
-
+#ifndef CONFIG_SPL_BUILD
 void inline_cnstr_jobdesc_blob_encap(uint32_t *desc, uint8_t *key_idnfr,
 				     uint8_t *plain_txt, uint8_t *enc_blob,
 				     uint32_t in_sz)
 {
-	dma_addr_t dma_addr_key_idnfr, dma_addr_in, dma_addr_out;
+	caam_dma_addr_t dma_addr_key_idnfr, dma_addr_in, dma_addr_out;
 	uint32_t key_sz = KEY_IDNFR_SZ_BYTES;
 	/* output blob will have 32 bytes key blob in beginning and
 	 * 16 byte HMAC identifier at end of data blob */
@@ -234,7 +236,7 @@ void inline_cnstr_jobdesc_blob_decap(uint32_t *desc, uint8_t *key_idnfr,
 				     uint8_t *enc_blob, uint8_t *plain_txt,
 				     uint32_t out_sz)
 {
-	dma_addr_t dma_addr_key_idnfr, dma_addr_in, dma_addr_out;
+	caam_dma_addr_t dma_addr_key_idnfr, dma_addr_in, dma_addr_out;
 	uint32_t key_sz = KEY_IDNFR_SZ_BYTES;
 	uint32_t in_sz = out_sz + KEY_BLOB_SIZE + MAC_SIZE;
 
@@ -252,12 +254,12 @@ void inline_cnstr_jobdesc_blob_decap(uint32_t *desc, uint8_t *key_idnfr,
 
 	append_operation(desc, OP_TYPE_DECAP_PROTOCOL | OP_PCLID_BLOB);
 }
-
+#endif
 /*
  * Descriptor to instantiate RNG State Handle 0 in normal mode and
  * load the JDKEK, TDKEK and TDSK registers
  */
-void inline_cnstr_jobdesc_rng_instantiation(uint32_t *desc)
+void inline_cnstr_jobdesc_rng_instantiation(uint32_t *desc, int handle)
 {
 	u32 *jump_cmd;
 
@@ -265,21 +267,24 @@ void inline_cnstr_jobdesc_rng_instantiation(uint32_t *desc)
 
 	/* INIT RNG in non-test mode */
 	append_operation(desc, OP_TYPE_CLASS1_ALG | OP_ALG_ALGSEL_RNG |
-			 OP_ALG_AS_INIT);
+			(handle << OP_ALG_AAI_SHIFT) | OP_ALG_AS_INIT);
 
-	/* wait for done */
-	jump_cmd = append_jump(desc, JUMP_CLASS_CLASS1);
-	set_jump_tgt_here(desc, jump_cmd);
+	/* For SH0, Secure Keys must be generated as well */
+	if (handle == 0) {
+		/* wait for done */
+		jump_cmd = append_jump(desc, JUMP_CLASS_CLASS1);
+		set_jump_tgt_here(desc, jump_cmd);
 
-	/*
-	 * load 1 to clear written reg:
-	 * resets the done interrrupt and returns the RNG to idle.
-	 */
-	append_load_imm_u32(desc, 1, LDST_SRCDST_WORD_CLRW);
+		/*
+		 * load 1 to clear written reg:
+		 * resets the done interrupt and returns the RNG to idle.
+		 */
+		append_load_imm_u32(desc, 1, LDST_SRCDST_WORD_CLRW);
 
-	/* generate secure keys (non-test) */
-	append_operation(desc, OP_TYPE_CLASS1_ALG | OP_ALG_ALGSEL_RNG |
-			 OP_ALG_RNG4_SK);
+		/* generate secure keys (non-test) */
+		append_operation(desc, OP_TYPE_CLASS1_ALG | OP_ALG_ALGSEL_RNG |
+				OP_ALG_RNG4_SK);
+	}
 }
 
 /* Change key size to bytes form bits in calling function*/
@@ -287,7 +292,7 @@ void inline_cnstr_jobdesc_pkha_rsaexp(uint32_t *desc,
 				      struct pk_in_params *pkin, uint8_t *out,
 				      uint32_t out_siz)
 {
-	dma_addr_t dma_addr_e, dma_addr_a, dma_addr_n, dma_addr_out;
+	caam_dma_addr_t dma_addr_e, dma_addr_a, dma_addr_n, dma_addr_out;
 
 	dma_addr_e = virt_to_phys((void *)pkin->e);
 	dma_addr_a = virt_to_phys((void *)pkin->a);

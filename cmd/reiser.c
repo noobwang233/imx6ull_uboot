@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2003 - 2004
  * Sysgo Real-Time Solutions, AG <www.elinos.com>
  * Pavel Bartusek <pba@sysgo.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -12,13 +11,14 @@
 #include <common.h>
 #include <config.h>
 #include <command.h>
+#include <env.h>
 #include <image.h>
 #include <linux/ctype.h>
 #include <asm/byteorder.h>
 #include <reiserfs.h>
 #include <part.h>
 
-#ifndef CONFIG_DOS_PARTITION
+#if !CONFIG_IS_ENABLED(DOS_PARTITION)
 #error DOS partition support must be selected
 #endif
 
@@ -34,13 +34,13 @@ int do_reiserls (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	char *filename = "/";
 	int dev, part;
-	block_dev_desc_t *dev_desc=NULL;
+	struct blk_desc *dev_desc = NULL;
 	disk_partition_t info;
 
 	if (argc < 3)
 		return CMD_RET_USAGE;
 
-	part = get_device_and_partition(argv[1], argv[2], &dev_desc, &info, 1);
+	part = blk_get_device_part_str(argv[1], argv[2], &dev_desc, &info, 1);
 	if (part < 0)
 		return 1;
 
@@ -48,7 +48,7 @@ int do_reiserls (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	    filename = argv[3];
 	}
 
-	dev = dev_desc->dev;
+	dev = dev_desc->devnum;
 	PRINTF("Using device %s %d:%d, directory: %s\n", argv[1], dev, part, filename);
 
 	reiserfs_set_blk_dev(dev_desc, &info);
@@ -82,24 +82,24 @@ int do_reiserload (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	int dev, part;
 	ulong addr = 0, filelen;
 	disk_partition_t info;
-	block_dev_desc_t *dev_desc = NULL;
+	struct blk_desc *dev_desc = NULL;
 	unsigned long count;
 	char *addr_str;
 
 	switch (argc) {
 	case 3:
-		addr_str = getenv("loadaddr");
+		addr_str = env_get("loadaddr");
 		if (addr_str != NULL) {
 			addr = simple_strtoul (addr_str, NULL, 16);
 		} else {
 			addr = CONFIG_SYS_LOAD_ADDR;
 		}
-		filename = getenv ("bootfile");
+		filename = env_get("bootfile");
 		count = 0;
 		break;
 	case 4:
 		addr = simple_strtoul (argv[3], NULL, 16);
-		filename = getenv ("bootfile");
+		filename = env_get("bootfile");
 		count = 0;
 		break;
 	case 5:
@@ -122,11 +122,11 @@ int do_reiserload (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		return 1;
 	}
 
-	part = get_device_and_partition(argv[1], argv[2], &dev_desc, &info, 1);
+	part = blk_get_device_part_str(argv[1], argv[2], &dev_desc, &info, 1);
 	if (part < 0)
 		return 1;
 
-	dev = dev_desc->dev;
+	dev = dev_desc->devnum;
 
 	printf("Loading file \"%s\" from %s device %d%c%c\n",
 		filename, argv[1], dev,
@@ -154,10 +154,10 @@ int do_reiserload (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	}
 
 	/* Loading ok, update default load address */
-	load_addr = addr;
+	image_load_addr = addr;
 
 	printf ("\n%ld bytes read\n", filelen);
-	setenv_hex("filesize", filelen);
+	env_set_hex("filesize", filelen);
 
 	return filelen;
 }

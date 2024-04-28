@@ -24,6 +24,7 @@
 
 #include <common.h>
 #include <command.h>
+#include <env.h>
 #include <net.h>
 #include <asm/unaligned.h>
 
@@ -184,7 +185,7 @@ static void dns_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 			ip_to_string(ip_addr, ip_str);
 			printf("%s\n", ip_str);
 			if (net_dns_env_var)
-				setenv(net_dns_env_var, ip_str);
+				env_set(net_dns_env_var, ip_str);
 		} else {
 			puts("server responded with invalid IP number\n");
 		}

@@ -1,41 +1,40 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <clk.h>
-#include <dm/device.h>
+#include <clk-uclass.h>
+#include <dm.h>
+#include <linux/clk-provider.h>
 
-DECLARE_GLOBAL_DATA_PTR;
-
-struct clk_fixed_rate {
-	unsigned long fixed_rate;
-};
-
-#define to_clk_fixed_rate(dev)	((struct clk_fixed_rate *)dev_get_platdata(dev))
-
-static ulong clk_fixed_rate_get_rate(struct udevice *dev)
+static ulong clk_fixed_rate_get_rate(struct clk *clk)
 {
-	return to_clk_fixed_rate(dev)->fixed_rate;
+	return to_clk_fixed_rate(clk->dev)->fixed_rate;
 }
 
-static ulong clk_fixed_rate_get_periph_rate(struct udevice *dev, int periph)
+/* avoid clk_enable() return -ENOSYS */
+static int dummy_enable(struct clk *clk)
 {
-	return clk_fixed_rate_get_rate(dev);
+	return 0;
 }
 
 const struct clk_ops clk_fixed_rate_ops = {
 	.get_rate = clk_fixed_rate_get_rate,
-	.get_periph_rate = clk_fixed_rate_get_periph_rate,
+	.enable = dummy_enable,
 };
 
 static int clk_fixed_rate_ofdata_to_platdata(struct udevice *dev)
 {
+	struct clk *clk = &to_clk_fixed_rate(dev)->clk;
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	to_clk_fixed_rate(dev)->fixed_rate =
-				fdtdec_get_int(gd->fdt_blob, dev->of_offset,
-					       "clock-frequency", 0);
+		dev_read_u32_default(dev, "clock-frequency", 0);
+#endif
+	/* Make fixed rate clock accessible from higher level struct clk */
+	dev->uclass_priv = clk;
+	clk->dev = dev;
+	clk->enable_count = 0;
 
 	return 0;
 }

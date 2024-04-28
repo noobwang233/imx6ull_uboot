@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Command for accessing SPI flash.
  *
  * Copyright (C) 2008 Atmel Corporation
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -18,6 +17,8 @@
 
 #include <asm/io.h>
 #include <dm/device-internal.h>
+
+#include "legacy-mtd-utils.h"
 
 static struct spi_flash *flash;
 
@@ -82,6 +83,7 @@ static int do_spi_flash_probe(int argc, char * const argv[])
 {
 	unsigned int bus = CONFIG_SF_DEFAULT_BUS;
 	unsigned int cs = CONFIG_SF_DEFAULT_CS;
+	/* In DM mode, defaults speed and mode will be taken from DT */
 	unsigned int speed = CONFIG_SF_DEFAULT_SPEED;
 	unsigned int mode = CONFIG_SF_DEFAULT_MODE;
 	char *endp;
@@ -122,8 +124,7 @@ static int do_spi_flash_probe(int argc, char * const argv[])
 	/* Remove the old device, otherwise probe will just be a nop */
 	ret = spi_find_bus_and_cs(bus, cs, &bus_dev, &new);
 	if (!ret) {
-		device_remove(new);
-		device_unbind(new);
+		device_remove(new, DM_REMOVE_NORMAL);
 	}
 	flash = NULL;
 	ret = spi_flash_probe_bus_cs(bus, cs, speed, mode, &new);
@@ -286,7 +287,7 @@ static int do_spi_flash_read_write(int argc, char * const argv[])
 	}
 
 	buf = map_physmem(addr, len, MAP_WRBACK);
-	if (!buf) {
+	if (!buf && addr) {
 		puts("Failed to map physical memory\n");
 		return 1;
 	}
@@ -413,7 +414,7 @@ static void show_time(struct test_info *test, int stage)
 		do_div(speed, test->time_ms[stage] * 1024);
 	bps = speed * 8;
 
-	printf("%d %s: %d ticks, %d KiB/s %d.%03d Mbps\n", stage,
+	printf("%d %s: %u ticks, %d KiB/s %d.%03d Mbps\n", stage,
 	       stage_name[stage], test->time_ms[stage],
 	       (int)speed, bps / 1000, bps % 1000);
 }

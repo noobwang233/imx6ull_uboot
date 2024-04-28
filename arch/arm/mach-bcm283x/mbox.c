@@ -1,11 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2012 Stephen Warren
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <asm/io.h>
+#include <asm/arch/base.h>
 #include <asm/arch/mbox.h>
 #include <phys2bus.h>
 
@@ -28,7 +29,7 @@ int bcm2835_mbox_call_raw(u32 chan, u32 send, u32 *recv)
 	/* Drain any stale responses */
 
 	for (;;) {
-		val = readl(&regs->status);
+		val = readl(&regs->mail0_status);
 		if (val & BCM2835_MBOX_STATUS_RD_EMPTY)
 			break;
 		if (get_timer(0) >= endtime) {
@@ -41,7 +42,7 @@ int bcm2835_mbox_call_raw(u32 chan, u32 send, u32 *recv)
 	/* Wait for space to send */
 
 	for (;;) {
-		val = readl(&regs->status);
+		val = readl(&regs->mail1_status);
 		if (!(val & BCM2835_MBOX_STATUS_WR_FULL))
 			break;
 		if (get_timer(0) >= endtime) {
@@ -59,7 +60,7 @@ int bcm2835_mbox_call_raw(u32 chan, u32 send, u32 *recv)
 	/* Wait for the response */
 
 	for (;;) {
-		val = readl(&regs->status);
+		val = readl(&regs->mail0_status);
 		if (!(val & BCM2835_MBOX_STATUS_RD_EMPTY))
 			break;
 		if (get_timer(0) >= endtime) {
@@ -115,7 +116,9 @@ int bcm2835_mbox_call_prop(u32 chan, struct bcm2835_mbox_hdr *buffer)
 			   (unsigned long)((void *)buffer +
 			   roundup(buffer->buf_size, ARCH_DMA_MINALIGN)));
 
-	ret = bcm2835_mbox_call_raw(chan, phys_to_bus((u32)buffer), &rbuffer);
+	ret = bcm2835_mbox_call_raw(chan,
+				    phys_to_bus((unsigned long)buffer),
+				    &rbuffer);
 	if (ret)
 		return ret;
 
@@ -123,7 +126,7 @@ int bcm2835_mbox_call_prop(u32 chan, struct bcm2835_mbox_hdr *buffer)
 				(unsigned long)((void *)buffer +
 				roundup(buffer->buf_size, ARCH_DMA_MINALIGN)));
 
-	if (rbuffer != phys_to_bus((u32)buffer)) {
+	if (rbuffer != phys_to_bus((unsigned long)buffer)) {
 		printf("mbox: Response buffer mismatch\n");
 		return -1;
 	}

@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (c) 2015 Purna Chandra Mandal <purna.mandal@microchip.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  *
  * Microchip PIC32MZ[DA] Starter Kit.
  */
@@ -10,17 +9,12 @@
 #define __PIC32MZDASK_CONFIG_H
 
 /* System Configuration */
-#define CONFIG_SYS_TEXT_BASE		0x9d004000 /* .text */
-#define CONFIG_DISPLAY_BOARDINFO
 
 /*--------------------------------------------
  * CPU configuration
  */
 /* CPU Timer rate */
 #define CONFIG_SYS_MIPS_TIMER_FREQ	100000000
-
-/* Cache Configuration */
-#define CONFIG_SYS_MIPS_CACHE_MODE	CONF_CM_CACHABLE_NONCOHERENT
 
 /*----------------------------------------------------------------------
  * Memory Layout
@@ -39,7 +33,6 @@
 #define CONFIG_SYS_SDRAM_BASE		0x88000000
 #define CONFIG_SYS_MALLOC_LEN		(256 << 10)
 #define CONFIG_SYS_BOOTPARAMS_LEN	(4 << 10)
-#define CONFIG_STACKSIZE		(4 << 10) /* regular stack */
 
 #define CONFIG_SYS_MONITOR_BASE		CONFIG_SYS_TEXT_BASE
 #define CONFIG_SYS_MONITOR_LEN		(192 << 10)
@@ -55,86 +48,37 @@
 /*----------------------------------------------------------------------
  * Commands
  */
-#define CONFIG_SYS_LONGHELP		/* undef to save memory */
-#define CONFIG_CMD_CLK
-
-/*-------------------------------------------------
- * FLASH configuration
- */
-#define CONFIG_SYS_NO_FLASH
 
 /*------------------------------------------------------------
  * Console Configuration
  */
-#define CONFIG_BAUDRATE			115200
 #define CONFIG_SYS_CBSIZE		1024 /* Console I/O Buffer Size   */
-#define CONFIG_SYS_MAXARGS		16   /* max number of command args*/
-#define CONFIG_SYS_PBSIZE		\
-		(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_CMDLINE_EDITING		1
 
 /*-----------------------------------------------------------------------
  * Networking Configuration
  */
-#define CONFIG_MII
 #define CONFIG_PHY_SMSC
 #define CONFIG_SYS_RX_ETH_BUFFER	8
 #define CONFIG_NET_RETRY_COUNT		20
 #define CONFIG_ARP_TIMEOUT		500 /* millisec */
 
-#define CONFIG_CMD_MII
-
 /*
  * BOOTP options
  */
 #define CONFIG_BOOTP_BOOTFILESIZE
-#define CONFIG_BOOTP_BOOTPATH
-#define CONFIG_BOOTP_GATEWAY
-#define CONFIG_BOOTP_HOSTNAME
 
-/*
- * Handover flattened device tree (dtb file) to Linux kernel
+/*--------------------------------------------------
+ * USB Configuration
  */
-#define CONFIG_OF_LIBFDT	1
-
-/*-----------------------------------------------------------------------
- * SDHC Configuration
- */
-#define CONFIG_SDHCI
-#define CONFIG_MMC
-#define CONFIG_GENERIC_MMC
-#define CONFIG_CMD_MMC
-
-/*-----------------------------------------------------------------------
- * File System Configuration
- */
-/* FAT FS */
-#define CONFIG_DOS_PARTITION
-#define CONFIG_PARTITION_UUIDS
-#define CONFIG_SUPPORT_VFAT
-#define CONFIG_FS_FAT
-#define CONFIG_FAT_WRITE
-#define CONFIG_CMD_FS_GENERIC
-#define CONFIG_CMD_PART
-#define CONFIG_CMD_FAT
-
-/* EXT4 FS */
-#define CONFIG_FS_EXT4
-#define CONFIG_CMD_EXT2
-#define CONFIG_CMD_EXT4
-#define CONFIG_CMD_EXT4_WRITE
 
 /* -------------------------------------------------
  * Environment
  */
-#define CONFIG_ENV_IS_NOWHERE	1
-#define CONFIG_ENV_SIZE		0x4000
 
 /* ---------------------------------------------------------------------
  * Board boot configuration
  */
 #define CONFIG_TIMESTAMP	/* Print image info with timestamp */
-#define CONFIG_BOOTDELAY	5
 
 #define MEM_LAYOUT_ENV_SETTINGS					\
 	"kernel_addr_r="__stringify(CONFIG_SYS_LOAD_ADDR)"\0"	\
@@ -153,6 +97,7 @@
 
 #define BOOT_TARGET_DEVICES(func)	\
 	func(MMC, mmc, 0)		\
+	func(USB, usb, 0)		\
 	func(DHCP, dhcp, na)
 
 #include <config_distro_bootcmd.h>

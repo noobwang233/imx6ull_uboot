@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) Marvell International Ltd. and its affiliates
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #include <common.h>
@@ -14,7 +13,7 @@
 #include "high_speed_env_spec.h"
 #include "board_env_spec.h"
 
-#define	SERDES_VERION	"2.1.5"
+#define	SERDES_VERSION	"2.1.5"
 #define ENDED_OK	"High speed PHY - Ended Successfully\n"
 
 static const u8 serdes_cfg[][SERDES_LAST_UNIT] = BIN_SERDES_CFG;
@@ -36,7 +35,7 @@ int pex_local_dev_num_set(u32 pex_if, u32 dev_num);
 #define	ETM_MODULE_DETECT               2
 
 #define PEX_MODE_GET(satr)		((satr & 0x6) >> 1)
-#define PEX_CAPABILITY_GET(satr)	(satr & 1)
+#define PEX_CAPABILITY_GET(satr, port)	((satr >> port) & 1)
 #define MV_PEX_UNIT_TO_IF(pex_unit)	((pex_unit < 3) ? (pex_unit * 4) : 9)
 
 /* Static parametes */
@@ -177,7 +176,7 @@ u8 board_cpu_freq_get(void)
 	return ((sar_msb & 0x100000) >> 17) | ((sar & 0xe00000) >> 21);
 }
 
-__weak MV_BIN_SERDES_CFG *board_serdes_cfg_get(u8 pex_mode)
+__weak MV_BIN_SERDES_CFG *board_serdes_cfg_get(void)
 {
 	u32 board_id;
 	u32 serdes_cfg_val = 0;	/* default */
@@ -230,6 +229,20 @@ static int serdes_max_lines_get(void)
 	return 0;
 }
 
+/*
+ * Tests have shown that on some boards the default width of the
+ * configuration pulse for the PEX link detection might lead to
+ * non-established PCIe links (link down). Especially under certain
+ * conditions (higher temperature) and with specific PCIe devices.
+ * To enable a board-specific detection pulse width this weak
+ * array "serdes_pex_pulse_width[4]" is introduced which can be
+ * overwritten if needed by a board-specific version. If the board
+ * code does not provide a non-weak version of this variable, the
+ * default value will be used. So nothing is changed from the
+ * current setup on the supported board.
+ */
+__weak u8 serdes_pex_pulse_width[4] = { 2, 2, 2, 2 };
+
 int serdes_phy_config(void)
 {
 	int status = MV_OK;
@@ -271,12 +284,12 @@ int serdes_phy_config(void)
 	if (reg_read(REG_BOOTROM_ROUTINE_ADDR) &
 	    (1 << REG_BOOTROM_ROUTINE_DRAM_INIT_OFFS)) {
 		DEBUG_INIT_S("High speed PHY - Version: ");
-		DEBUG_INIT_S(SERDES_VERION);
+		DEBUG_INIT_S(SERDES_VERSION);
 		DEBUG_INIT_S(" - 2nd boot - Skip\n");
 		return MV_OK;
 	}
 	DEBUG_INIT_S("High speed PHY - Version: ");
-	DEBUG_INIT_S(SERDES_VERION);
+	DEBUG_INIT_S(SERDES_VERSION);
 	DEBUG_INIT_S(" (COM-PHY-V20)\n");
 
 	/*
@@ -339,17 +352,17 @@ int serdes_phy_config(void)
 		DEBUG_WR_REG(CPU_AVS_CONTROL2_REG, cpu_avs);
 	}
 
-	info = board_serdes_cfg_get(PEX_MODE_GET(satr11));
-	DEBUG_INIT_FULL_S("info->line0_7= 0x");
-	DEBUG_INIT_FULL_D(info->line0_7, 8);
-	DEBUG_INIT_FULL_S("   info->line8_15= 0x");
-	DEBUG_INIT_FULL_D(info->line8_15, 8);
-	DEBUG_INIT_FULL_S("\n");
+	info = board_serdes_cfg_get();
 
 	if (info == NULL) {
 		DEBUG_INIT_S("Hight speed PHY Error #1\n");
 		return MV_ERROR;
 	}
+	DEBUG_INIT_FULL_S("info->line0_7= 0x");
+	DEBUG_INIT_FULL_D(info->line0_7, 8);
+	DEBUG_INIT_FULL_S("   info->line8_15= 0x");
+	DEBUG_INIT_FULL_D(info->line8_15, 8);
+	DEBUG_INIT_FULL_S("\n");
 
 	if (config_module & ETM_MODULE_DETECT) {	/* step 0.9 ETM */
 		DEBUG_INIT_FULL_S("ETM module detect Step 0.9:\n");
@@ -662,7 +675,7 @@ int serdes_phy_config(void)
 				tmp |= (0x1 << 4);
 			if (info->pex_mode[pex_unit] == PEX_BUS_MODE_X4)
 				tmp |= (0x4 << 4);
-			if (0 == PEX_CAPABILITY_GET(satr11))
+			if (0 == PEX_CAPABILITY_GET(satr11, pex_unit))
 				tmp |= 0x1;
 			else
 				tmp |= 0x2;
@@ -891,6 +904,23 @@ int serdes_phy_config(void)
 			pex_unit = line_num >> 2;
 			pex_line_num = line_num % 4;
 			if (0 == pex_line_num) {
+				/*
+				 * Configure the detection pulse with before
+				 * the reset is deasserted
+				 */
+
+				/* Read the old value (indirect access) */
+				reg_write(PEX_PHY_ACCESS_REG(pex_unit),
+					  (0x48 << 16) | (1 << 31) |
+					  (pex_line_num << 24));
+				tmp = reg_read(PEX_PHY_ACCESS_REG(pex_unit));
+				tmp &= ~(1 << 31);	/* Clear read */
+				tmp &= ~(3 << 6);	/* Mask width */
+				/* Insert new detection pulse width */
+				tmp |= serdes_pex_pulse_width[pex_unit] << 6;
+				/* Write value back */
+				reg_write(PEX_PHY_ACCESS_REG(pex_unit), tmp);
+
 				reg_write(PEX_PHY_ACCESS_REG(pex_unit),
 					  (0xC1 << 16) | 0x24);
 				DEBUG_WR_REG(PEX_PHY_ACCESS_REG(pex_unit),

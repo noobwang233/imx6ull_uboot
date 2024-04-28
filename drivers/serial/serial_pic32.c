@@ -1,12 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (c) 2015 Paul Thacker <paul.thacker@microchip.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  *
  */
 #include <common.h>
 #include <clk.h>
 #include <dm.h>
+#include <malloc.h>
 #include <serial.h>
 #include <wait_bit.h>
 #include <mach/pic32.h>
@@ -51,8 +51,8 @@ static int pic32_serial_init(void __iomem *base, ulong clk, u32 baudrate)
 	u32 div = DIV_ROUND_CLOSEST(clk, baudrate * 16);
 
 	/* wait for TX FIFO to empty */
-	wait_for_bit(__func__, base + U_STA, UART_TX_EMPTY,
-		     true, CONFIG_SYS_HZ, false);
+	wait_for_bit_le32(base + U_STA, UART_TX_EMPTY,
+			  true, CONFIG_SYS_HZ, false);
 
 	/* send break */
 	writel(UART_TX_BRK, base + U_STASET);
@@ -135,23 +135,25 @@ static int pic32_uart_getc(struct udevice *dev)
 static int pic32_uart_probe(struct udevice *dev)
 {
 	struct pic32_uart_priv *priv = dev_get_priv(dev);
-	struct udevice *clkdev;
+	struct clk clk;
 	fdt_addr_t addr;
 	fdt_size_t size;
 	int ret;
 
 	/* get address */
-	addr = fdtdec_get_addr_size(gd->fdt_blob, dev->of_offset, "reg", &size);
+	addr = fdtdec_get_addr_size(gd->fdt_blob, dev_of_offset(dev), "reg",
+				    &size);
 	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
 	priv->base = ioremap(addr, size);
 
 	/* get clock rate */
-	ret = clk_get_by_index(dev, 0, &clkdev);
+	ret = clk_get_by_index(dev, 0, &clk);
 	if (ret < 0)
 		return ret;
-	priv->uartclk = clk_get_periph_rate(clkdev, ret);
+	priv->uartclk = clk_get_rate(&clk);
+	clk_free(&clk);
 
 	/* initialize serial */
 	return pic32_serial_init(priv->base, priv->uartclk, CONFIG_BAUDRATE);
@@ -175,7 +177,6 @@ U_BOOT_DRIVER(pic32_serial) = {
 	.of_match	= pic32_uart_ids,
 	.probe		= pic32_uart_probe,
 	.ops		= &pic32_uart_ops,
-	.flags		= DM_FLAG_PRE_RELOC,
 	.priv_auto_alloc_size = sizeof(struct pic32_uart_priv),
 };
 

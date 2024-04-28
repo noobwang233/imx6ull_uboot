@@ -76,6 +76,7 @@ static int kwboot_verbose;
 
 static int msg_req_delay = KWBOOT_MSG_REQ_DELAY;
 static int msg_rsp_timeo = KWBOOT_MSG_RSP_TIMEO;
+static int blk_rsp_timeo = KWBOOT_BLK_RSP_TIMEO;
 
 static void
 kwboot_printv(const char *fmt, ...)
@@ -181,7 +182,7 @@ kwboot_tty_recv(int fd, void *buf, size_t len, int timeo)
 		}
 
 		n = read(fd, buf, len);
-		if (n < 0)
+		if (n <= 0)
 			goto out;
 
 		buf = (char *)buf + n;
@@ -285,6 +286,7 @@ kwboot_bootmsg(int tty, void *msg)
 {
 	int rc;
 	char c;
+	int count;
 
 	if (msg == NULL)
 		kwboot_printv("Please reboot the target into UART boot mode...");
@@ -296,10 +298,12 @@ kwboot_bootmsg(int tty, void *msg)
 		if (rc)
 			break;
 
-		rc = kwboot_tty_send(tty, msg, 8);
-		if (rc) {
-			usleep(msg_req_delay * 1000);
-			continue;
+		for (count = 0; count < 128; count++) {
+			rc = kwboot_tty_send(tty, msg, 8);
+			if (rc) {
+				usleep(msg_req_delay * 1000);
+				continue;
+			}
 		}
 
 		rc = kwboot_tty_recv(tty, &c, 1, msg_rsp_timeo);
@@ -380,7 +384,7 @@ kwboot_xm_sendblock(int fd, struct kwboot_block *block)
 			break;
 
 		do {
-			rc = kwboot_tty_recv(fd, &c, 1, KWBOOT_BLK_RSP_TIMEO);
+			rc = kwboot_tty_recv(fd, &c, 1, blk_rsp_timeo);
 			if (rc)
 				break;
 
@@ -425,6 +429,9 @@ kwboot_xmodem(int tty, const void *_data, size_t size)
 
 	kwboot_printv("Sending boot image...\n");
 
+	sleep(2); /* flush isn't effective without it */
+	tcflush(tty, TCIOFLUSH);
+
 	do {
 		struct kwboot_block block;
 		int n;
@@ -465,7 +472,7 @@ kwboot_term_pipe(int in, int out, char *quit, int *s)
 	char _buf[128], *buf = _buf;
 
 	nin = read(in, buf, sizeof(buf));
-	if (nin < 0)
+	if (nin <= 0)
 		return -1;
 
 	if (quit) {
@@ -654,14 +661,6 @@ kwboot_img_patch_hdr(void *img, size_t size)
 
 	hdr->blockid = IBR_HDR_UART_ID;
 
-	/*
-	 * Subtract mkimage header size from destination address
-	 * as this header is not expected by the Marvell BootROM.
-	 * This way, the execution address is identical to the
-	 * one the image is compiled for (TEXT_BASE).
-	 */
-	hdr->destaddr = hdr->destaddr - sizeof(struct image_header);
-
 	if (image_ver == 0) {
 		struct main_hdr_v0 *hdr_v0 = img;
 
@@ -684,7 +683,7 @@ static void
 kwboot_usage(FILE *stream, char *progname)
 {
 	fprintf(stream,
-		"Usage: %s [-d | -a | -q <req-delay> | -s <resp-timeo> | -b <image> | -D <image> ] [ -t ] [-B <baud> ] <TTY>\n",
+		"Usage: %s [OPTIONS] [-b <image> | -D <image> ] [-B <baud> ] <TTY>\n",
 		progname);
 	fprintf(stream, "\n");
 	fprintf(stream,
@@ -696,6 +695,8 @@ kwboot_usage(FILE *stream, char *progname)
 	fprintf(stream, "  -a: use timings for Armada XP\n");
 	fprintf(stream, "  -q <req-delay>:  use specific request-delay\n");
 	fprintf(stream, "  -s <resp-timeo>: use specific response-timeout\n");
+	fprintf(stream,
+		"  -o <block-timeo>: use specific xmodem block timeout\n");
 	fprintf(stream, "\n");
 	fprintf(stream, "  -t: mini terminal\n");
 	fprintf(stream, "\n");
@@ -728,7 +729,7 @@ main(int argc, char **argv)
 	kwboot_verbose = isatty(STDOUT_FILENO);
 
 	do {
-		int c = getopt(argc, argv, "hb:ptaB:dD:q:s:");
+		int c = getopt(argc, argv, "hb:ptaB:dD:q:s:o:");
 		if (c < 0)
 			break;
 
@@ -766,6 +767,10 @@ main(int argc, char **argv)
 
 		case 's':
 			msg_rsp_timeo = atoi(optarg);
+			break;
+
+		case 'o':
+			blk_rsp_timeo = atoi(optarg);
 			break;
 
 		case 'B':
@@ -822,7 +827,7 @@ main(int argc, char **argv)
 			perror("debugmsg");
 			goto out;
 		}
-	} else {
+	} else if (bootmsg) {
 		rc = kwboot_bootmsg(tty, bootmsg);
 		if (rc) {
 			perror("bootmsg");
