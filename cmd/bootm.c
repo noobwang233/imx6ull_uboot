@@ -633,7 +633,7 @@ int do_bootz(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	 * We are doing the BOOTM_STATE_LOADOS state ourselves, so must
 	 * disable interrupts ourselves
 	 */
-	bootm_disable_interrupts();
+	bootm_disable_interrupts();//调用函数 bootm_disable_interrupts关闭中断。
 
 	images.os.os = IH_OS_LINUX;
 	ret = do_bootm_states(cmdtp, flag, argc, argv,

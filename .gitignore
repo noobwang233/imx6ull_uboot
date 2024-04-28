@@ -85,3 +85,4 @@ GTAGS
 *~
 \#*#
 compile_commands.json
+out/*

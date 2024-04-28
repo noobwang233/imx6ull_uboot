@@ -290,11 +290,11 @@ typedef struct image_header {
 } image_header_t;
 
 typedef struct image_info {
-	ulong		start, end;		/* start/end of blob */
-	ulong		image_start, image_len; /* start of image within blob, len of image */
-	ulong		load;			/* load addr for the image */
-	uint8_t		comp, type, os;		/* compression, type of image, os type */
-	uint8_t		arch;			/* CPU architecture */
+	ulong		start, end;		/* blob开始和结束位置*/
+	ulong		image_start, image_len; /* 镜像起始地址(包括blob)和长度 */
+	ulong		load;			/* 系统镜像加载地址*/
+	uint8_t		comp, type, os;		/* 镜像压缩、类型，OS类型 */
+	uint8_t		arch;			/* CPU架构 */
 } image_info_t;
 
 /*
@@ -332,18 +332,18 @@ typedef struct bootm_headers {
 #endif
 
 #ifndef USE_HOSTCC
-	image_info_t	os;		/* os image info */
-	ulong		ep;		/* entry point of OS */
+	image_info_t	os;		/* OS镜像信息 */
+	ulong		ep;			/* OS入口点 */
 
-	ulong		rd_start, rd_end;/* ramdisk start/end */
+	ulong		rd_start, rd_end;/* ramdisk开始和结束位置 */
 
-	char		*ft_addr;	/* flat dev tree address */
-	ulong		ft_len;		/* length of flat device tree */
+	char		*ft_addr;	/* 设备树地址 */
+	ulong		ft_len;		/* 设备树长度 */
 
-	ulong		initrd_start;
-	ulong		initrd_end;
-	ulong		cmdline_start;
-	ulong		cmdline_end;
+	ulong		initrd_start; /* initrd开始位置 */
+	ulong		initrd_end;   /* initrd结束位置 */
+	ulong		cmdline_start;/* cmdline开始位置 */
+	ulong		cmdline_end;  /* cmdline结束位置 */
 	bd_t		*kbd;
 #endif
 

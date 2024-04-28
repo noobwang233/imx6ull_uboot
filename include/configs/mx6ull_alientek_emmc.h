@@ -109,7 +109,7 @@
 	"initrd_addr=0x83800000\0" \
 	"initrd_high=0xffffffff\0" \
 	"bootcmd_mfg=run mfgtool_args;bootz ${loadaddr} ${initrd_addr} ${fdt_addr};\0" \
-
+	// "bootcmd_mfg=run bootcmd\0" 
 #if defined(CONFIG_SYS_BOOT_NAND)
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	CONFIG_MFG_ENV_SETTINGS \
@@ -325,7 +325,7 @@
 
 #if (CONFIG_FEC_ENET_DEV == 0)
 #define IMX_FEC_BASE			ENET_BASE_ADDR
-#define CONFIG_FEC_MXC_PHYADDR          0x0
+#define CONFIG_FEC_MXC_PHYADDR          0x2
 #define CONFIG_FEC_XCV_TYPE             RMII
 #elif (CONFIG_FEC_ENET_DEV == 1)
 #define IMX_FEC_BASE			ENET2_BASE_ADDR
@@ -335,7 +335,7 @@
 #define CONFIG_ETHPRIME			"FEC"
 
 #define CONFIG_PHYLIB
-#define CONFIG_PHY_SMSC
+#define CONFIG_PHY_REALTEK
 #endif
 
 #define CONFIG_IMX_THERMAL

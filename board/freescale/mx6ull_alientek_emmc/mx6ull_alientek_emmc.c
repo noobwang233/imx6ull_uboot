@@ -554,6 +554,7 @@ static void setup_iomux_fec(int fec_id)
 		mdelay(20);
 		gpio_set_value(ENET2_RESET, 1);
 	}
+	mdelay(150);
 }
 
 
