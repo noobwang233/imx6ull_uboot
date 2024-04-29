@@ -103,8 +103,7 @@
 	CONFIG_MFG_ENV_SETTINGS \
 	TEE_ENV \
 	"script=boot.scr\0" \
-	"ethaddr 00:04:9f:04:d2:35\0"\
-	"eth1addr 00:04:9f:04:d2:36\0"\
+	"eth1addr 12:34:56:78:9a:bc\0"\
 	"image=zImage\0" \
 	"console=ttymxc0\0" \
 	"baudrate=115200\0"\
