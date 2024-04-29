@@ -73,14 +73,7 @@
 #define CONFIG_FASTBOOT_USB_DEV 0
 
 #define CONFIG_MFG_ENV_SETTINGS \
-	CONFIG_MFG_ENV_SETTINGS_DEFAULT \
-	"initrd_addr=0x86800000\0" \
-	"initrd_high=0xffffffff\0" \
-	"emmc_dev=1\0"\
-	"emmc_ack=1\0"\
-	"sd_dev=1\0" \
-	"mtdparts=" MFG_NAND_PARTITION \
-	"\0"\
+	"bootcmd_mfg=run bootcmd;\0"
 
 #if defined(CONFIG_NAND_BOOT)
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -219,19 +212,11 @@
 			"fi;\0" \
 
 #define CONFIG_BOOTCOMMAND \
-	   "run findfdt;" \
-	   "run findtee;" \
-	   "mmc dev ${mmcdev};" \
-	   "mmc dev ${mmcdev}; if mmc rescan; then " \
-		   "if run loadbootscript; then " \
-			   "run bootscript; " \
-		   "else " \
-			   "if run loadimage; then " \
-				   "run mmcboot; " \
-			   "else run netboot; " \
-			   "fi; " \
-		   "fi; " \
-	   "else run netboot; fi"
+	"run mmcargs;"\
+	"mmc dev 1;" \
+	"fatload mmc 1:1 0x80800000 zImage;" \
+	"fatload mmc 1:1 0x83000000 imx6ull-14x14-emmc-4.3-800x480-c.dtb;" \
+	"bootz 0x80800000 - 0x83000000;"	
 #endif
 
 /* Miscellaneous configurable options */
