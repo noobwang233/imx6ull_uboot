@@ -103,7 +103,7 @@
 	CONFIG_MFG_ENV_SETTINGS \
 	TEE_ENV \
 	"script=boot.scr\0" \
-	"eth1addr 12:34:56:78:9a:bc\0"\
+	"eth1addr=12:34:56:78:9a:bc\0"\
 	"image=zImage\0" \
 	"console=ttymxc0\0" \
 	"baudrate=115200\0"\
@@ -297,4 +297,7 @@
 #define CONFIG_MODULE_FUSE
 #define CONFIG_OF_SYSTEM_SETUP
 
+#ifdef CONFIG_CMD_NET
+#define CONFIG_FEC_ENET_DEV     1
+#endif
 #endif
