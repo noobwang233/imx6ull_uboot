@@ -73,7 +73,7 @@
 #define CONFIG_FASTBOOT_USB_DEV 0
 
 #define CONFIG_MFG_ENV_SETTINGS \
-	"bootcmd_mfg=run bootcmd;\0"
+	"bootcmd_mfg=;\0"
 
 #if defined(CONFIG_NAND_BOOT)
 #define CONFIG_EXTRA_ENV_SETTINGS \
