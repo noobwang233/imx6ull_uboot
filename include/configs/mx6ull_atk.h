@@ -15,6 +15,13 @@
 #include <asm/mach-imx/gpio.h>
 #include "imx_env.h"
 
+
+#define CONFIG_IPADDR       192.168.28.234      /* board ip */
+#define CONFIG_SERVERIP     192.168.28.254      /* ubuntu ip */
+#define CONFIG_GATEWAYIP    192.168.28.1        /* board gateway ip */
+#define CONFIG_NETMASK      255.255.255.0       /* board netmask */
+
+
 #define is_mx6ull_9x9_evk()	CONFIG_IS_ENABLED(TARGET_MX6ULL_9X9_EVK)
 
 #ifdef CONFIG_TARGET_MX6ULL_9X9_EVK
@@ -103,8 +110,11 @@
 	CONFIG_MFG_ENV_SETTINGS \
 	TEE_ENV \
 	"script=boot.scr\0" \
+	"ethaddr 00:04:9f:04:d2:35\0"\
+	"eth1addr 00:04:9f:04:d2:36\0"\
 	"image=zImage\0" \
 	"console=ttymxc0\0" \
+	"baudrate=115200\0"\
 	"fdt_high=0xffffffff\0" \
 	"initrd_high=0xffffffff\0" \
 	"fdt_file=undefined\0" \

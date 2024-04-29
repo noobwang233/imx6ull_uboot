@@ -3,9 +3,9 @@
 // Copyright (C) 2015 Freescale Semiconductor, Inc.
 
 / {
-	aliases {
-		spi5 = &{/spi4};
-	};
+	// aliases {
+	// 	spi5 = &{/spi4};
+	// };
 
 	chosen {
 		stdout-path = &uart1;
@@ -26,37 +26,37 @@
 		enable-active-high;
 	};
 
-	reg_can_3v3: regulator-can-3v3 {
-		compatible = "regulator-fixed";
-		regulator-name = "can-3v3";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		gpios = <&gpio_spi 3 GPIO_ACTIVE_LOW>;
-	};
+	// reg_can_3v3: regulator-can-3v3 {
+	// 	compatible = "regulator-fixed";
+	// 	regulator-name = "can-3v3";
+	// 	regulator-min-microvolt = <3300000>;
+	// 	regulator-max-microvolt = <3300000>;
+	// 	gpios = <&gpio_spi 3 GPIO_ACTIVE_LOW>;
+	// };
 
-	spi4 {
-		compatible = "spi-gpio";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_spi4>;
-		status = "okay";
-		pinctrl-assert-gpios = <&gpio5 8 GPIO_ACTIVE_LOW>;
-		gpio-sck = <&gpio5 11 0>;
-		gpio-mosi = <&gpio5 10 0>;
-		cs-gpios = <&gpio5 7 0>;
-		num-chipselects = <1>;
-		#address-cells = <1>;
-		#size-cells = <0>;
+	// spi4 {
+	// 	compatible = "spi-gpio";
+	// 	pinctrl-names = "default";
+	// 	pinctrl-0 = <&pinctrl_spi4>;
+	// 	status = "okay";
+	// 	pinctrl-assert-gpios = <&gpio5 8 GPIO_ACTIVE_LOW>;
+	// 	gpio-sck = <&gpio5 11 0>;
+	// 	gpio-mosi = <&gpio5 10 0>;
+	// 	cs-gpios = <&gpio5 7 0>;
+	// 	num-chipselects = <1>;
+	// 	#address-cells = <1>;
+	// 	#size-cells = <0>;
 
-		gpio_spi: gpio@0 {
-			compatible = "fairchild,74hc595";
-			gpio-controller;
-			#gpio-cells = <2>;
-			reg = <0>;
-			registers-number = <1>;
-			registers-default = /bits/ 8 <0x57>;
-			spi-max-frequency = <100000>;
-		};
-	};
+	// 	gpio_spi: gpio@0 {
+	// 		compatible = "fairchild,74hc595";
+	// 		gpio-controller;
+	// 		#gpio-cells = <2>;
+	// 		reg = <0>;
+	// 		registers-number = <1>;
+	// 		registers-default = /bits/ 8 <0x57>;
+	// 		spi-max-frequency = <100000>;
+	// 	};
+	// };
 };
 
 &clks {
@@ -70,12 +70,12 @@
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
 
-	codec: wm8960@1a {
-		#sound-dai-cells = <0>;
-		compatible = "wlf,wm8960";
-		reg = <0x1a>;
-		wlf,shared-lrclk;
-	};
+	// codec: wm8960@1a {
+	// 	#sound-dai-cells = <0>;
+	// 	compatible = "wlf,wm8960";
+	// 	reg = <0x1a>;
+	// 	wlf,shared-lrclk;
+	// };
 };
 
 &fec1 {
@@ -113,22 +113,22 @@
 	};
 };
 
-&can1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_flexcan1>;
-	xceiver-supply = <&reg_can_3v3>;
-	status = "okay";
-};
+// &can1 {
+// 	pinctrl-names = "default";
+// 	pinctrl-0 = <&pinctrl_flexcan1>;
+// 	xceiver-supply = <&reg_can_3v3>;
+// 	status = "okay";
+// };
 
-&can2 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_flexcan2>;
-	xceiver-supply = <&reg_can_3v3>;
-	status = "okay";
-};
+// &can2 {
+// 	pinctrl-names = "default";
+// 	pinctrl-0 = <&pinctrl_flexcan2>;
+// 	xceiver-supply = <&reg_can_3v3>;
+// 	status = "okay";
+// };
 
 &i2c1 {
-	clock-frequency = <100000>;
+	clock-frequency = <400000>;
 	pinctrl-names = "default", "gpio";
 	pinctrl-0 = <&pinctrl_i2c1>;
 	pinctrl-1 = <&pinctrl_i2c1_gpio>;
@@ -136,9 +136,13 @@
 	sda-gpios = <&gpio1 29 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 
-	mag3110@e {
-		compatible = "fsl,mag3110";
-		reg = <0x0e>;
+	// mag3110@e {
+	// 	compatible = "fsl,mag3110";
+	// 	reg = <0x0e>;
+	// };
+	oled@3c{
+		compatible = "oled,sh1106";
+		reg = <0x3c>;
 	};
 };
 
@@ -158,14 +162,14 @@
 			native-mode = <&timing0>;
 			timing0: timing0 {
 			clock-frequency = <9200000>;
-			hactive = <480>;
-			vactive = <272>;
-			hfront-porch = <8>;
-			hback-porch = <4>;
-			hsync-len = <41>;
+			hactive = <800>;
+			vactive = <480>;
+			hfront-porch = <88>;
+			hback-porch = <40>;
+			hsync-len = <48>;
 			vback-porch = <2>;
 			vfront-porch = <4>;
-			vsync-len = <10>;
+			vsync-len = <3>;
 
 			hsync-active = <0>;
 			vsync-active = <0>;
@@ -444,14 +448,14 @@
 		>;
 	};
 
-	pinctrl_spi4: spi4grp {
-		fsl,pins = <
-			MX6UL_PAD_BOOT_MODE0__GPIO5_IO10	0x70a1
-			MX6UL_PAD_BOOT_MODE1__GPIO5_IO11	0x70a1
-			MX6UL_PAD_SNVS_TAMPER7__GPIO5_IO07	0x70a1
-			MX6UL_PAD_SNVS_TAMPER8__GPIO5_IO08	0x80000000
-		>;
-	};
+	// pinctrl_spi4: spi4grp {
+	// 	fsl,pins = <
+	// 		MX6UL_PAD_BOOT_MODE0__GPIO5_IO10	0x70a1
+	// 		MX6UL_PAD_BOOT_MODE1__GPIO5_IO11	0x70a1
+	// 		MX6UL_PAD_SNVS_TAMPER7__GPIO5_IO07	0x70a1
+	// 		MX6UL_PAD_SNVS_TAMPER8__GPIO5_IO08	0x80000000
+	// 	>;
+	// };
 
 	pinctrl_tsc: tscgrp {
 		fsl,pins = <

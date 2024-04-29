@@ -9,8 +9,8 @@
 #include "imx6ull-atk-uboot.dtsi"
 
 / {
-	model = "i.MX6 ULL ATK mini Board";
-	compatible = "fsl,imx6ull-atk-mini", "fsl,imx6ull";
+	model = "i.MX6 ULL ATK Board";
+	compatible = "fsl,imx6ull-atk-mini", "fsl,imx6ull-atk", "fsl,imx6ull";
 };
 
 &clks {
