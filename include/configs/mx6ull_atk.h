@@ -213,9 +213,10 @@
 #define CONFIG_BOOTCOMMAND \
 	"run mmcargs;"\
 	"mmc dev 1;" \
-	"fatload mmc 1:1 0x80800000 zImage;" \
-	"fatload mmc 1:1 0x83000000 imx6ull-14x14-emmc-4.3-800x480-c.dtb;" \
-	"bootz 0x80800000 - 0x83000000;"	
+	"ext4load mmc 1:2 0x80800000 /boot/zImage;" \
+	"ext4load mmc 1:2 0x83000000 /boot/imx6ull-atk-mini-emmc.dtb;" \
+	"bootz 0x80800000 - 0x83000000;"
+	// "fatload mmc 1:1 0x83000000 imx6ull-14x14-emmc-4.3-800x480-c.dtb;"
 #endif
 
 /* Miscellaneous configurable options */
