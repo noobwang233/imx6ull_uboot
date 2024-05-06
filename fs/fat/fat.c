@@ -50,7 +50,7 @@ static int disk_read(__u32 block, __u32 nr_blocks, void *buf)
 
 	if (!cur_dev || !cur_dev->block_read)
 		return -1;
-
+	// 读取当前块设备的当前分区为开始的nr_blocks个扇区
 	ret = cur_dev->block_read(cur_dev, cur_part_info.start + block,
 				  nr_blocks, buf);
 
@@ -62,9 +62,10 @@ static int disk_read(__u32 block, __u32 nr_blocks, void *buf)
 
 int fat_set_blk_dev(block_dev_desc_t *dev_desc, disk_partition_t *info)
 {
+	// 分配buffer，大小为块设备的一个扇区大小
 	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, buffer, dev_desc->blksz);
 
-	cur_dev = dev_desc;
+	cur_dev = dev_desc; // 更新fat.c下的两个全局变量 cur_dev 和 cur_part_info
 	cur_part_info = *info;
 
 	/* Make sure it has a valid FAT header */
