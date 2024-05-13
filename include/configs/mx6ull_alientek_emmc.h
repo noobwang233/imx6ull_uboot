@@ -16,7 +16,10 @@
 
 /* uncomment for PLUGIN mode support */
 /* #define CONFIG_USE_PLUGIN */
-
+#define CONFIG_IPADDR       192.168.5.9      /* board ip */
+#define CONFIG_SERVERIP     192.168.5.10      /* ubuntu ip */
+#define CONFIG_GATEWAYIP    192.168.5.1        /* board gateway ip */
+#define CONFIG_NETMASK      255.255.255.0       /* board netmask */
 /* uncomment for SECURE mode support */
 /* #define CONFIG_SECURE_BOOT */
 
