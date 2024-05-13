@@ -826,7 +826,13 @@ static struct phy_device *get_phy_device(struct mii_dev *bus, int addr,
 {
 	return get_phy_device_by_mask(bus, 1 << addr, interface);
 }
+static void msleep (int count)
+{
+	int i;
 
+	for (i = 0; i < count; i++)
+		udelay (1000);
+}
 int phy_reset(struct phy_device *phydev)
 {
 	int reg;
@@ -874,7 +880,7 @@ int phy_reset(struct phy_device *phydev)
 		puts("PHY reset timed out\n");
 		return -1;
 	}
-
+	msleep(200);
 	return 0;
 }
 

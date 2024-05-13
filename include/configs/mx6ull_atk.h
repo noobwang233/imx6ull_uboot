@@ -16,9 +16,9 @@
 #include "imx_env.h"
 
 
-#define CONFIG_IPADDR       192.168.28.234      /* board ip */
-#define CONFIG_SERVERIP     192.168.28.254      /* ubuntu ip */
-#define CONFIG_GATEWAYIP    192.168.28.1        /* board gateway ip */
+#define CONFIG_IPADDR       192.168.5.9      /* board ip */
+#define CONFIG_SERVERIP     192.168.5.10      /* ubuntu ip */
+#define CONFIG_GATEWAYIP    192.168.5.1        /* board gateway ip */
 #define CONFIG_NETMASK      255.255.255.0       /* board netmask */
 
 
