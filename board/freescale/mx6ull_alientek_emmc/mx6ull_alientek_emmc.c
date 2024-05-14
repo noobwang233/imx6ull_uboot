@@ -88,8 +88,56 @@ DECLARE_GLOBAL_DATA_PTR;
 	PAD_CTL_PUS_47K_UP  | PAD_CTL_SPEED_LOW |		\
 	PAD_CTL_DSE_80ohm   | PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
 
+/* #define IOX_SDI IMX_GPIO_NR(5, 10)
+#define IOX_STCP IMX_GPIO_NR(5, 7)
+#define IOX_SHCP IMX_GPIO_NR5(5, 11)
+#define IOX_OE IMX_GPIO_NR(5, 8)*/
+
 #define ENET1_RESET IMX_GPIO_NR(5, 7)
 #define ENET2_RESET IMX_GPIO_NR(5, 8)
+
+
+/*
+ * HDMI_nRST --> Q0
+ * ENET1_nRST --> Q1
+ * ENET2_nRST --> Q2
+ * CAN1_2_STBY --> Q3
+ * BT_nPWD --> Q4
+ * CSI_RST --> Q5
+ * CSI_PWDN --> Q6
+ * LCD_nPWREN --> Q7
+ */
+enum qn {
+	HDMI_NRST,
+	ENET1_NRST,
+	ENET2_NRST,
+	CAN1_2_STBY,
+	BT_NPWD,
+	CSI_RST,
+	CSI_PWDN,
+	LCD_NPWREN,
+};
+
+enum qn_func {
+	qn_reset,
+	qn_enable,
+	qn_disable,
+};
+
+enum qn_level {
+	qn_low = 0,
+	qn_high = 1,
+};
+
+static enum qn_level seq[3][2] = {
+	{0, 1}, {1, 1}, {0, 0}
+};
+
+static enum qn_func qn_output[8] = {
+	qn_reset, qn_reset, qn_reset, qn_enable, qn_disable, qn_reset,
+	qn_disable, qn_disable
+};
+
 
 #ifdef CONFIG_SYS_I2C_MXC
 #define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
@@ -539,20 +587,21 @@ static iomux_v3_cfg_t const fec2_pads[] = {
 
 static void setup_iomux_fec(int fec_id)
 {
-	if (fec_id == 0){
-		imx_iomux_v3_setup_multiple_pads(fec1_pads, ARRAY_SIZE(fec1_pads));
+	if (fec_id == 0) {
+		imx_iomux_v3_setup_multiple_pads(fec1_pads,
+						 ARRAY_SIZE(fec1_pads));
 		gpio_direction_output(ENET1_RESET, 1);
 		gpio_set_value(ENET1_RESET, 0);
 		mdelay(20);
-		gpio_set_value(ENET1_RESET, 1);
-	}
-	else
-	{
-		imx_iomux_v3_setup_multiple_pads(fec2_pads, ARRAY_SIZE(fec2_pads));
+		gpio_set_value(ENET1_RESET, 1);	
+	}			 
+	else {
+		imx_iomux_v3_setup_multiple_pads(fec2_pads,
+						 ARRAY_SIZE(fec2_pads));
 		gpio_direction_output(ENET2_RESET, 1);
 		gpio_set_value(ENET2_RESET, 0);
 		mdelay(20);
-		gpio_set_value(ENET2_RESET, 1);
+		gpio_set_value(ENET2_RESET, 1);	
 	}
 	mdelay(150);
 }
@@ -639,7 +688,7 @@ static iomux_v3_cfg_t const lcd_pads[] = {
 	MX6_PAD_LCD_DATA23__LCDIF_DATA23 | MUX_PAD_CTRL(LCD_PAD_CTRL),
 
 	/* LCD_RST */
-	MX6_PAD_SNVS_TAMPER9__GPIO5_IO09 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	//MX6_PAD_SNVS_TAMPER9__GPIO5_IO09 | MUX_PAD_CTRL(NO_PAD_CTRL),
 
 	/* Use GPIO for Brightness adjustment, duty cycle = period. */
 	MX6_PAD_GPIO1_IO08__GPIO1_IO08 | MUX_PAD_CTRL(NO_PAD_CTRL),
@@ -652,9 +701,9 @@ void do_enable_parallel_lcd(struct display_info_t const *dev)
 	imx_iomux_v3_setup_multiple_pads(lcd_pads, ARRAY_SIZE(lcd_pads));
 
 	/* Reset the LCD */
-	gpio_direction_output(IMX_GPIO_NR(5, 9) , 0);
+	/*gpio_direction_output(IMX_GPIO_NR(5, 9) , 0);
 	udelay(500);
-	gpio_direction_output(IMX_GPIO_NR(5, 9) , 1);
+	gpio_direction_output(IMX_GPIO_NR(5, 9) , 1); */
 
 	/* Set Brightness to high */
 	gpio_direction_output(IMX_GPIO_NR(1, 8) , 1);
