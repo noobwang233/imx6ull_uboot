@@ -172,7 +172,7 @@
 		"fi;\0" \
 	"fatboot=run mmcargs;" \
 		"fatload mmc 1:1 0x80800000 zImage;" \
-		"fatload mmc 1:1 0x83000000 imx6ull-14x14-emmc-4.3-800x480-c.dtb;" \
+		"fatload mmc 1:1 0x83000000 imx6ull-atk-mini-emmc.dtb;" \
 		"bootz 0x80800000 - 0x83000000;\0" \
 	"ext4boot=run mmcargs;" \
 		"ext4load mmc 1:2 0x80800000 /boot/zImage;" \
