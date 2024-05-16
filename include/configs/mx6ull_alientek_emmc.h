@@ -214,7 +214,7 @@
 			"fi;\0" \
 
 #define CONFIG_BOOTCOMMAND \
-	"run fatboot;"
+	"run ext4boot;"
 #endif
 
 /* Miscellaneous configurable options */
