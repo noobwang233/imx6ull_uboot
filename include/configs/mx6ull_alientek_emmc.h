@@ -119,8 +119,8 @@
 	"panel=TFT43AB\0" \
 	"fdt_addr=0x83000000\0" \
 	"fdt_high=0xffffffff\0"	  \
-	"console=ttymxc0\0" \
-	"bootargs=console=ttymxc0,115200 ubi.mtd=4 "  \
+	"console=tty1 console=ttymxc0\0" \
+	"bootargs=console=tty1 console=ttymxc0,115200 ubi.mtd=4 "  \
 		"root=ubi0:rootfs rootfstype=ubifs "		     \
 		CONFIG_BOOTARGS_CMA_SIZE \
 		"mtdparts=gpmi-nand:64m(boot),16m(kernel),16m(dtb),1m(misc),-(rootfs)\0"\
@@ -134,7 +134,7 @@
 	"script=boot.scr\0" \
 	"eth1addr=b8:ae:1d:01:00:00\0"\
 	"image=zImage\0" \
-	"console=ttymxc0\0" \
+	"console=tty1 console=ttymxc0\0" \
 	"fdt_high=0xffffffff\0" \
 	"initrd_high=0xffffffff\0" \
 	"fdt_file=undefined\0" \
